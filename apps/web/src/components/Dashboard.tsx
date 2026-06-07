@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { WsMessage } from '@team-coder/shared';
 import { api, type FeedItem, type ModuleOwnership, type PresenceRow } from '../lib/api';
 import { queryClient } from '../lib/query';
@@ -8,10 +8,12 @@ import { Board } from './Board';
 import { Ownership } from './Ownership';
 import { Feed } from './Feed';
 import { Tasks } from './Tasks';
+import { Report } from './Report';
 
 export function Dashboard() {
   const { token, connected, setConnected, hydratePresence, applyPresence, hydrateFeed, pushFeed, setOwnership, logout } =
     useStore();
+  const [view, setView] = useState<'board' | 'report'>('board');
 
   useEffect(() => {
     if (!token) return;
@@ -51,18 +53,26 @@ export function Dashboard() {
       <header>
         <h1>Team Coder</h1>
         <span className={`conn ${connected ? 'on' : 'off'}`}>{connected ? 'live' : 'connecting…'}</span>
+        <nav className="view-tabs">
+          <button className={view === 'board' ? 'active' : ''} onClick={() => setView('board')}>Board</button>
+          <button className={view === 'report' ? 'active' : ''} onClick={() => setView('report')}>Report</button>
+        </nav>
         <button className="logout" onClick={logout}>sign out</button>
       </header>
-      <main>
-        <div className="col-main">
-          <Board />
-          <Tasks />
-        </div>
-        <div className="col-side">
-          <Ownership />
-          <Feed />
-        </div>
-      </main>
+      {view === 'board' ? (
+        <main>
+          <div className="col-main">
+            <Board />
+            <Tasks />
+          </div>
+          <div className="col-side">
+            <Ownership />
+            <Feed />
+          </div>
+        </main>
+      ) : (
+        <Report />
+      )}
     </div>
   );
 }

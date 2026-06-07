@@ -46,6 +46,40 @@ export interface Task {
   updatedAt: string;
 }
 
+export interface CoderStat {
+  id: string;
+  name: string;
+  color: string | null;
+  commits: number;
+  linesAdded: number;
+  linesRemoved: number;
+  filesTouched: number;
+  edits: number;
+  prompts: number;
+  toolCalls: number;
+  activeMinutes: number;
+  tasksCompleted: number;
+  decisions: number;
+  patterns: number;
+  modulesOwned: number;
+  pct: { lines: number; commits: number; tasks: number; edits: number; blended: number };
+}
+
+export interface ModuleStat {
+  name: string;
+  pathPrefix: string;
+  totalLines: number;
+  contributors: { id: string; name: string; color: string | null; lines: number; pct: number }[];
+}
+
+export interface Report {
+  generatedAt: string;
+  coders: CoderStat[];
+  modules: ModuleStat[];
+  timeline: { t: string; perCoder: Record<string, number> }[];
+  totals: { commits: number; linesAdded: number; tasksCompleted: number; activeMinutes: number };
+}
+
 export interface ModuleOwnership {
   moduleId: string;
   name: string;
