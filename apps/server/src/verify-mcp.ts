@@ -55,6 +55,13 @@ try {
   if (created.task?.id) {
     const edited = textOf((await client.callTool({ name: 'edit_task', arguments: { task_id: created.task.id, title: 'mcp-renamed task' } })) as never) as { ok: boolean };
     check(!!edited.ok, 'edit_task renamed the task');
+
+    // assign_task to a different coder (bob), confirm cross-assignment
+    const bob = users.find((u) => u.username === 'bob')!;
+    const assigned = textOf((await client.callTool({ name: 'assign_task', arguments: { task_id: created.task.id, assignee: 'bob' } })) as never) as { ok: boolean };
+    const after = (await (await fetch(`${BASE}/api/tasks`, { headers: teamHeaders })).json()) as Array<{ id: string; assigneeId: string }>;
+    const t2 = after.find((t) => t.id === created.task?.id);
+    check(!!assigned.ok && t2?.assigneeId === bob.id, 'assign_task delegated to Bob (not self)');
   }
 
   await client.close();

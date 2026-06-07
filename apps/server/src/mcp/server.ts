@@ -160,6 +160,32 @@ export function createMcpServer(dev: Developer): McpServer {
   );
 
   server.registerTool(
+    'assign_task',
+    {
+      description: 'Assign a task to a specific teammate (by username or display name). Use to carve up and delegate work — unlike claim_task, which is self only.',
+      inputSchema: { task_id: z.string(), assignee: z.string().describe('teammate username or display name') },
+    },
+    async ({ task_id, assignee }) => {
+      const [u] = await db
+        .select({ id: schema.users.id, displayName: schema.users.displayName, username: schema.users.username })
+        .from(schema.users)
+        .where(or(eq(schema.users.username, assignee), eq(schema.users.displayName, assignee)));
+      if (!u) {
+        const all = await db.select({ username: schema.users.username }).from(schema.users);
+        return text({ error: `no coder named "${assignee}"`, available: all.map((a) => a.username) });
+      }
+      const [row] = await db
+        .update(schema.tasks)
+        .set({ assigneeId: u.id, updatedAt: new Date() })
+        .where(eq(schema.tasks.id, task_id))
+        .returning(TASK_FIELDS);
+      if (!row) return text({ error: 'task not found' });
+      pushFeed({ ...feedBase, kind: 'claim', detail: `assigned "${row.title}" to ${u.displayName ?? u.username}` });
+      return text({ ok: true, task: row, assignedTo: u.displayName ?? u.username });
+    },
+  );
+
+  server.registerTool(
     'update_task_progress',
     { description: 'Update a task status and optionally add a progress note.', inputSchema: { task_id: z.string(), status: z.enum(TASK_STATUS), note: z.string().optional() } },
     async ({ task_id, status, note }) => {
