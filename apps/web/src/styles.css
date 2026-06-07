@@ -192,8 +192,31 @@ main { display: grid; grid-template-columns: 1fr 360px; gap: 1rem; align-items: 
 .ph-repo:hover { text-decoration: underline; }
 .ph-progress { margin-left: auto; text-align: right; display: flex; flex-direction: column; }
 .ph-pct { font-size: 1.4rem; font-weight: 700; color: var(--green); }
+.ph-goal { color: var(--green); margin-top: 0.15rem; }
 .ph-prd { margin-top: 0.6rem; }
 .prd-body { background: #0b0d12; border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; margin: 0.5rem 0 0; font-size: 0.8rem; white-space: pre-wrap; word-break: break-word; max-height: 240px; overflow-y: auto; }
+.prd-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+.prd-empty { display: flex; align-items: center; gap: 0.6rem; }
+.prd-edit textarea { width: 100%; background: #0b0d12; color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; font-family: ui-monospace, Menlo, monospace; font-size: 0.8rem; resize: vertical; }
+.prd-actions { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.5rem; }
+.prd-actions .primary, .gen-btn { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 0.35rem 0.7rem; font-weight: 600; cursor: pointer; font-size: 0.8rem; }
+.gen-btn { margin-left: auto; }
+.goal-tag { font-size: 0.75rem; flex: none; }
+
+/* ── PRD decomposition review ───────────────────────────── */
+.decompose { margin-top: 0.8rem; background: var(--panel-2); }
+.dc-head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+.dc-head h3 { margin: 0; font-size: 0.95rem; }
+.dc-head .link-btn { margin-left: auto; }
+.dc-toolbar { display: flex; gap: 0.75rem; margin-bottom: 0.4rem; }
+.dc-toolbar .link-btn { padding: 0 !important; }
+.dc-list { list-style: none; margin: 0 0 0.75rem; padding: 0; max-height: 320px; overflow-y: auto; }
+.dc-list li { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; border-top: 1px solid var(--border); }
+.dc-list li.off { opacity: 0.45; }
+.dc-title { flex: 1; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 0.35rem 0.5rem; font-size: 0.85rem; }
+.dc-mod { font-size: 0.65rem; color: var(--accent); background: rgba(91,140,255,0.12); padding: 0.1rem 0.4rem; border-radius: 4px; flex: none; }
+.dc-commit { width: 100%; background: var(--green); color: #06210b; border: none; border-radius: 8px; padding: 0.55rem; font-weight: 700; cursor: pointer; }
+.dc-commit:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── Notes panel ───────────────────────────────────────── */
 .notes ul { list-style: none; margin: 0; padding: 0; }

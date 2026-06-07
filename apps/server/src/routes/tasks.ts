@@ -44,6 +44,33 @@ taskRoutes.post('/', async (c) => {
   return c.json(row, 201);
 });
 
+// Bulk-create tasks from PRD decomposition (marked source='prd' so the board can
+// measure progress against the stated goal). The DB trigger broadcasts each new
+// row, so the board updates live without extra plumbing.
+taskRoutes.post('/bulk', async (c) => {
+  const project = c.get('project');
+  const body = (await c.req.json().catch(() => ({}))) as {
+    tasks?: Array<{ title?: string; description?: string; moduleId?: string }>;
+    reporterId?: string;
+  };
+  const incoming = (body.tasks ?? []).filter((t) => t.title?.trim()).slice(0, 200);
+  if (!incoming.length) return c.json({ error: 'no tasks to create' }, 400);
+  const rows = await db
+    .insert(schema.tasks)
+    .values(
+      incoming.map((t) => ({
+        projectId: project.id,
+        title: t.title!.trim().slice(0, 255),
+        description: t.description?.trim() || null,
+        moduleId: t.moduleId ?? null,
+        reporterId: body.reporterId ?? null,
+        source: 'prd' as const,
+      })),
+    )
+    .returning();
+  return c.json({ created: rows.length, tasks: rows }, 201);
+});
+
 async function actor(projectId: string, userId: string | undefined) {
   if (!userId) return null;
   const [u] = await db

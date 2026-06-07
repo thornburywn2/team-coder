@@ -93,6 +93,27 @@ export function createMcpServer(dev: Developer): McpServer {
   );
 
   server.registerTool(
+    'get_project_goal',
+    { description: 'The project goal / PRD plus progress against it. Read this first to understand what the team is building.', inputSchema: {} },
+    async () => {
+      const [proj] = await db
+        .select({ name: schema.projects.name, prd: schema.projects.prd })
+        .from(schema.projects)
+        .where(eq(schema.projects.id, pid));
+      const goalTasks = await db
+        .select({ status: schema.tasks.status })
+        .from(schema.tasks)
+        .where(and(eq(schema.tasks.projectId, pid), eq(schema.tasks.source, 'prd')));
+      const done = goalTasks.filter((t) => t.status === 'done').length;
+      return text({
+        project: proj?.name ?? null,
+        goal: proj?.prd ?? null,
+        goalTasks: { total: goalTasks.length, done, remaining: goalTasks.length - done },
+      });
+    },
+  );
+
+  server.registerTool(
     'search_tasks',
     { description: 'Search tasks by text and/or status.', inputSchema: { query: z.string().optional(), status: z.enum(TASK_STATUS).optional() } },
     async ({ query, status }) => {

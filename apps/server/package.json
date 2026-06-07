@@ -18,7 +18,8 @@
     "verify:gitpoll": "bun run src/verify-gitpoll.ts",
     "verify:report": "bun run src/verify-report.ts",
     "verify:isolation": "bun run src/verify-isolation.ts",
-    "verify:notes": "bun run src/verify-notes.ts"
+    "verify:notes": "bun run src/verify-notes.ts",
+    "verify:decompose": "bun run src/verify-decompose.ts"
   },
   "dependencies": {
     "@team-coder/shared": "workspace:*",

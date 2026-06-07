@@ -4,6 +4,11 @@
 export const TASK_STATUS = ['todo', 'in_progress', 'in_review', 'done', 'blocked'] as const;
 export type TaskStatus = (typeof TASK_STATUS)[number];
 
+// How a task entered the board: hand-added ('manual') vs derived from the project
+// PRD via decomposition ('prd'). Lets the board measure progress vs the stated goal.
+export const TASK_SOURCE = ['manual', 'prd'] as const;
+export type TaskSource = (typeof TASK_SOURCE)[number];
+
 export const PROPOSAL_STATUS = ['draft', 'open', 'accepted', 'rejected', 'withdrawn'] as const;
 export type ProposalStatus = (typeof PROPOSAL_STATUS)[number];
 

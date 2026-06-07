@@ -53,6 +53,7 @@ export function Tasks() {
           return (
             <li key={t.id} className={`task task-${t.status}`}>
               <span className={`badge ${t.status}`}>{t.status.replace('_', ' ')}</span>
+              {t.source === 'prd' && <span className="goal-tag" title="from the project goal (PRD)">🎯</span>}
               <span className="task-title">{t.title}</span>
               {owner && (
                 <span className="owner">

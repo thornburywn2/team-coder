@@ -74,11 +74,35 @@ export interface Task {
   title: string;
   description: string | null;
   status: 'todo' | 'in_progress' | 'in_review' | 'done' | 'blocked';
+  source: 'manual' | 'prd';
   assigneeId: string | null;
   moduleId: string | null;
   filePaths: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+// A proposed task from PRD decomposition (preview — not yet persisted).
+export interface DecomposeCandidate {
+  title: string;
+  description?: string;
+  moduleId?: string;
+  moduleName?: string;
+}
+
+// Save the project goal/PRD.
+export function updatePrd(prd: string): Promise<ProjectInfo> {
+  return api<ProjectInfo>('/projects/current/prd', { method: 'PUT', body: JSON.stringify({ prd }) });
+}
+
+// Preview tasks decomposed from a PRD (uses the saved one if `prd` omitted).
+export function decompose(prd?: string): Promise<{ candidates: DecomposeCandidate[] }> {
+  return api('/projects/current/decompose', { method: 'POST', body: JSON.stringify({ prd }) });
+}
+
+// Commit selected candidate tasks to the board (marked source='prd').
+export function bulkCreateTasks(tasks: DecomposeCandidate[], reporterId?: string | null) {
+  return api<{ created: number }>('/tasks/bulk', { method: 'POST', body: JSON.stringify({ tasks, reporterId }) });
 }
 
 export interface ConnectionStatus {

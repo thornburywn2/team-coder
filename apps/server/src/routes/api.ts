@@ -6,6 +6,7 @@ import { getConnection, getConnections } from '../connections';
 import { recentFeed } from '../feed';
 import { computeOwnership } from '../ownership';
 import { buildReport } from '../report';
+import { decomposePrd } from '../lib/decompose';
 import { taskRoutes } from './tasks';
 
 // Human portal REST. Read endpoints for initial hydration; the WebSocket keeps
@@ -18,6 +19,33 @@ apiRoutes.use('*', teamAuth);
 
 // the project this token belongs to (name / repo / PRD) — for the board header
 apiRoutes.get('/projects/current', (c) => c.json(c.get('project')));
+
+// PRD ingestion — save/update the project's goal document (markdown).
+apiRoutes.put('/projects/current/prd', async (c) => {
+  const project = c.get('project');
+  const body = (await c.req.json().catch(() => ({}))) as { prd?: string };
+  const prd = typeof body.prd === 'string' ? body.prd : '';
+  const [row] = await db
+    .update(schema.projects)
+    .set({ prd: prd.trim() || null })
+    .where(eq(schema.projects.id, project.id))
+    .returning({ id: schema.projects.id, name: schema.projects.name, githubRepoUrl: schema.projects.githubRepoUrl, prd: schema.projects.prd });
+  return c.json(row);
+});
+
+// Decompose a PRD into candidate tasks for review (preview only — NO writes).
+// Uses the posted PRD if given (preview unsaved edits), else the saved one.
+apiRoutes.post('/projects/current/decompose', async (c) => {
+  const project = c.get('project');
+  const body = (await c.req.json().catch(() => ({}))) as { prd?: string };
+  const prd = (typeof body.prd === 'string' ? body.prd : project.prd) ?? '';
+  if (!prd.trim()) return c.json({ error: 'no PRD to decompose — add a project goal first' }, 400);
+  const mods = await db
+    .select({ id: schema.modules.id, name: schema.modules.name, pathPrefix: schema.modules.pathPrefix })
+    .from(schema.modules)
+    .where(eq(schema.modules.projectId, project.id));
+  return c.json({ candidates: decomposePrd(prd, mods) });
+});
 
 // live activity feed (in-memory ring buffer, most-recent-first), this project only
 apiRoutes.get('/feed', (c) => c.json(recentFeed(c.get('project').id)));
