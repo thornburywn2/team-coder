@@ -60,3 +60,7 @@ CREATE TRIGGER trg_activity_change AFTER INSERT ON activity_events
 DROP TRIGGER IF EXISTS trg_presence_change ON user_presence;
 CREATE TRIGGER trg_presence_change AFTER INSERT OR UPDATE OR DELETE ON user_presence
   FOR EACH ROW EXECUTE FUNCTION notify_record_change('user_id');
+
+DROP TRIGGER IF EXISTS trg_notes_change ON project_notes;
+CREATE TRIGGER trg_notes_change AFTER INSERT OR UPDATE OR DELETE ON project_notes
+  FOR EACH ROW EXECUTE FUNCTION notify_record_change('id');
