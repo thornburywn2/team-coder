@@ -1,15 +1,16 @@
 import { useEffect } from 'react';
 import type { WsMessage } from '@team-coder/shared';
-import { api, type FeedItem, type PresenceRow } from '../lib/api';
+import { api, type FeedItem, type ModuleOwnership, type PresenceRow } from '../lib/api';
 import { queryClient } from '../lib/query';
 import { connectSocket, onMessage } from '../lib/socket';
 import { useStore } from '../store';
 import { Board } from './Board';
+import { Ownership } from './Ownership';
 import { Feed } from './Feed';
 import { Tasks } from './Tasks';
 
 export function Dashboard() {
-  const { token, connected, setConnected, hydratePresence, applyPresence, hydrateFeed, pushFeed, logout } =
+  const { token, connected, setConnected, hydratePresence, applyPresence, hydrateFeed, pushFeed, setOwnership, logout } =
     useStore();
 
   useEffect(() => {
@@ -27,6 +28,9 @@ export function Dashboard() {
           break;
         case 'ACTIVITY_EVENT':
           pushFeed(msg.payload as FeedItem);
+          break;
+        case 'OWNERSHIP_UPDATE':
+          setOwnership(msg.payload as ModuleOwnership[]);
           break;
         case 'TASK_CREATED':
         case 'TASK_UPDATED':
@@ -55,6 +59,7 @@ export function Dashboard() {
           <Tasks />
         </div>
         <div className="col-side">
+          <Ownership />
           <Feed />
         </div>
       </main>

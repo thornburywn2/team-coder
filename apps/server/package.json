@@ -12,7 +12,8 @@
     "db:seed": "bun run src/db/seed.ts",
     "db:verify": "bun run src/db/verify-notify.ts",
     "verify:ws": "bun run src/verify-ws.ts",
-    "verify:hooks": "bun run src/simulate-hooks.ts"
+    "verify:hooks": "bun run src/simulate-hooks.ts",
+    "verify:ownership": "bun run src/verify-ownership.ts"
   },
   "dependencies": {
     "@team-coder/shared": "workspace:*",

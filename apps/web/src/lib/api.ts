@@ -46,6 +46,16 @@ export interface Task {
   updatedAt: string;
 }
 
+export interface ModuleOwnership {
+  moduleId: string;
+  name: string;
+  pathPrefix: string;
+  ownerId: string | null;
+  ownerName: string | null;
+  inferred: boolean;
+  contributors: { developerId: string; name: string; edits: number }[];
+}
+
 export interface FeedItem {
   id: string;
   ts: number;

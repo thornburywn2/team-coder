@@ -3,6 +3,7 @@ import { apiRoutes } from './routes/api';
 import { hookRoutes } from './routes/hooks';
 import { wsRoute, websocket } from './ws';
 import { startDbListener } from './db/listener';
+import { refreshOwnership } from './ownership';
 
 // ── Team Coder server (Bun runtime) ──────────────────────────────────────────
 // Mounts: /health, /api (REST, team-token gated), /ws (WebSocket fan-out).
@@ -33,6 +34,12 @@ const port = Number(process.env.PORT ?? 6300);
 startDbListener().catch((err) =>
   console.error('[listener] failed to start (is the DB up?):', err?.message ?? err),
 );
+
+// Recompute + broadcast auto-inferred ownership every 30s (and once at boot).
+const OWNERSHIP_POLL_MS = 30_000;
+const tick = () => refreshOwnership().catch((err) => console.error('[ownership] refresh failed:', err?.message ?? err));
+setInterval(tick, OWNERSHIP_POLL_MS);
+tick();
 
 console.log(`[team-coder] server listening on http://localhost:${port}`);
 

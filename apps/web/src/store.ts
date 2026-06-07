@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { FeedItem, PresenceRow } from './lib/api';
+import type { FeedItem, ModuleOwnership, PresenceRow } from './lib/api';
 
 // Ephemeral live state (presence + feed + connection), updated by the WebSocket.
 // Auth identity (token + which coder you are) is persisted to localStorage.
@@ -10,6 +10,7 @@ interface Store {
   connected: boolean;
   presence: Record<string, PresenceRow>;
   feed: FeedItem[];
+  ownership: ModuleOwnership[];
 
   setAuth: (token: string, meId: string) => void;
   logout: () => void;
@@ -18,6 +19,7 @@ interface Store {
   applyPresence: (row: PresenceRow) => void;
   hydrateFeed: (items: FeedItem[]) => void;
   pushFeed: (item: FeedItem) => void;
+  setOwnership: (o: ModuleOwnership[]) => void;
 }
 
 export const useStore = create<Store>((set) => ({
@@ -26,6 +28,7 @@ export const useStore = create<Store>((set) => ({
   connected: false,
   presence: {},
   feed: [],
+  ownership: [],
 
   setAuth: (token, meId) => {
     localStorage.setItem('tc_token', token);
@@ -35,7 +38,7 @@ export const useStore = create<Store>((set) => ({
   logout: () => {
     localStorage.removeItem('tc_token');
     localStorage.removeItem('tc_me');
-    set({ token: null, meId: null, connected: false, presence: {}, feed: [] });
+    set({ token: null, meId: null, connected: false, presence: {}, feed: [], ownership: [] });
   },
   setConnected: (connected) => set({ connected }),
   hydratePresence: (rows) =>
@@ -44,4 +47,5 @@ export const useStore = create<Store>((set) => ({
     set((s) => ({ presence: { ...s.presence, [row.userId]: { ...s.presence[row.userId], ...row } } })),
   hydrateFeed: (items) => set({ feed: items }),
   pushFeed: (item) => set((s) => ({ feed: [item, ...s.feed].slice(0, 100) })),
+  setOwnership: (ownership) => set({ ownership }),
 }));

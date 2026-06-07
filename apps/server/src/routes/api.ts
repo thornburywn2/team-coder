@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { db, schema } from '../db';
 import { teamAuth } from '../auth';
 import { recentFeed } from '../feed';
+import { computeOwnership } from '../ownership';
 import { taskRoutes } from './tasks';
 
 // Human portal REST. Read endpoints for initial hydration; the WebSocket keeps
@@ -15,6 +16,9 @@ apiRoutes.use('*', teamAuth);
 apiRoutes.get('/feed', (c) => c.json(recentFeed()));
 
 apiRoutes.get('/presence', async (c) => c.json(await db.select().from(schema.userPresence)));
+
+// auto-inferred module ownership (live, computed on demand)
+apiRoutes.get('/modules/ownership', async (c) => c.json(await computeOwnership()));
 
 apiRoutes.get('/users', async (c) =>
   c.json(
