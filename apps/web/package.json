@@ -11,8 +11,11 @@
   },
   "dependencies": {
     "@team-coder/shared": "workspace:*",
+    "@tanstack/react-query": "^5.62.0",
+    "partysocket": "^1.0.2",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.2"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",

@@ -5,6 +5,10 @@ import react from '@vitejs/plugin-react';
 // so the browser talks to a single origin in dev.
 export default defineConfig({
   plugins: [react()],
+  // Pin an explicit (empty) PostCSS config so Vite doesn't traverse up the
+  // filesystem and pick up an unrelated parent-dir postcss.config — keeps the
+  // build hermetic and portable.
+  css: { postcss: {} },
   server: {
     port: 6301,
     proxy: {
