@@ -9,11 +9,12 @@ import { Ownership } from './Ownership';
 import { Feed } from './Feed';
 import { Tasks } from './Tasks';
 import { Report } from './Report';
+import { Connect } from './Connect';
 
 export function Dashboard() {
   const { token, connected, setConnected, hydratePresence, applyPresence, hydrateFeed, pushFeed, setOwnership, logout } =
     useStore();
-  const [view, setView] = useState<'board' | 'report'>('board');
+  const [view, setView] = useState<'board' | 'report' | 'connect'>('board');
 
   useEffect(() => {
     if (!token) return;
@@ -56,6 +57,7 @@ export function Dashboard() {
         <nav className="view-tabs">
           <button className={view === 'board' ? 'active' : ''} onClick={() => setView('board')}>Board</button>
           <button className={view === 'report' ? 'active' : ''} onClick={() => setView('report')}>Report</button>
+          <button className={view === 'connect' ? 'active' : ''} onClick={() => setView('connect')}>Connect agent</button>
         </nav>
         <button className="logout" onClick={logout}>sign out</button>
       </header>
@@ -70,8 +72,10 @@ export function Dashboard() {
             <Feed />
           </div>
         </main>
-      ) : (
+      ) : view === 'report' ? (
         <Report />
+      ) : (
+        <Connect />
       )}
     </div>
   );

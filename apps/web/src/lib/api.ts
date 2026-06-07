@@ -46,6 +46,20 @@ export interface Task {
   updatedAt: string;
 }
 
+export interface ConnectionStatus {
+  userId: string;
+  lastMcp: number;
+  lastHook: number;
+}
+
+export interface ConnectInfo {
+  id: string;
+  username: string;
+  displayName: string | null;
+  agentToken: string | null;
+  connection: ConnectionStatus;
+}
+
 export interface CoderStat {
   id: string;
   name: string;

@@ -6,6 +6,7 @@ import { db, schema } from '../db';
 import { devAuth, type Developer } from '../auth';
 import { scrubSecrets } from '../lib/scrub';
 import { pushFeed, type FeedItem } from '../feed';
+import { touchHook } from '../connections';
 
 // Claude Code hook ingestion. Each coder's agent POSTs lifecycle events here with
 // their personal Bearer token (devAuth -> developer). We persist the raw event,
@@ -20,6 +21,8 @@ hookRoutes.post('/event', async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = HookEventSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: 'invalid hook payload' }, 400);
+
+  touchHook(dev.id); // record hook-lane liveness for the connection indicator
 
   // Fire-and-forget: kick off the writes and return immediately so the agent is
   // never blocked (hard <50ms target). The inserts run concurrently inside ingest.
