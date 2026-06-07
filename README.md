@@ -1,6 +1,6 @@
 # Team Coder
 
-Coordination portal for a 5-person team of vibe coders driving AI agents on one
+Coordination portal for a team of vibe coders (any size) driving AI agents on one
 shared hackathon product. Live status · auto-inferred ownership · scoped
 messaging · collective design · an MCP server that feeds each coder's agent live
 project truth.

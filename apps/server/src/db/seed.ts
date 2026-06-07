@@ -1,15 +1,18 @@
+import { sql } from 'drizzle-orm';
 import { db, queryClient, schema } from './index';
 
-// Idempotent dev seed: 5 coders (2-2-1), their presence rows, and example
-// module path_prefixes. Re-runnable — conflicts are ignored.
-// NOTE: agentToken values here are dev placeholders; each coder sets their own.
+// Idempotent dev seed: example coders, their presence rows, and example module
+// path_prefixes. Re-runnable — existing rows are updated. The team can be any
+// size: add or remove entries here (or add coders via the portal at kickoff).
+// Emails map git commit authors -> coders for the git-poll / contribution report.
+// NOTE: agentToken values are dev placeholders; each coder sets their own.
 
 const CODERS = [
-  { username: 'alice', displayName: 'Alice (Frontend)', color: '#e6194B', agentToken: 'dev-token-alice' },
-  { username: 'bob', displayName: 'Bob (Frontend)', color: '#3cb44b', agentToken: 'dev-token-bob' },
-  { username: 'carol', displayName: 'Carol (Backend)', color: '#4363d8', agentToken: 'dev-token-carol' },
-  { username: 'dave', displayName: 'Dave (Backend)', color: '#f58231', agentToken: 'dev-token-dave' },
-  { username: 'erin', displayName: 'Erin (Integrator)', color: '#911eb4', agentToken: 'dev-token-erin' },
+  { username: 'alice', displayName: 'Alice', email: 'alice@teamcoder.dev', color: '#e6194B', agentToken: 'dev-token-alice' },
+  { username: 'bob', displayName: 'Bob', email: 'bob@teamcoder.dev', color: '#3cb44b', agentToken: 'dev-token-bob' },
+  { username: 'carol', displayName: 'Carol', email: 'carol@teamcoder.dev', color: '#4363d8', agentToken: 'dev-token-carol' },
+  { username: 'dave', displayName: 'Dave', email: 'dave@teamcoder.dev', color: '#f58231', agentToken: 'dev-token-dave' },
+  { username: 'erin', displayName: 'Erin', email: 'erin@teamcoder.dev', color: '#911eb4', agentToken: 'dev-token-erin' },
 ];
 
 // Example modules — replace path_prefixes with the real product repo layout at kickoff.
@@ -23,7 +26,15 @@ try {
   const insertedUsers = await db
     .insert(schema.users)
     .values(CODERS)
-    .onConflictDoNothing({ target: schema.users.username })
+    .onConflictDoUpdate({
+      target: schema.users.username,
+      set: {
+        displayName: sql`excluded.display_name`,
+        email: sql`excluded.email`,
+        color: sql`excluded.color`,
+        agentToken: sql`excluded.agent_token`,
+      },
+    })
     .returning({ id: schema.users.id });
 
   // presence rows for everyone currently in the table

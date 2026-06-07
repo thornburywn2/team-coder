@@ -185,6 +185,35 @@ export const hookEvents = pgTable('hook_events', {
   eventIdx: index('idx_hook_events_event').on(t.eventName, t.ts),
 }));
 
+// ── Git contributions (tool-agnostic ground truth from the polled product repo) ──
+export const gitCommits = pgTable('git_commits', {
+  sha: text('sha').primaryKey(),
+  developerId: uuid('developer_id').references(() => users.id, { onDelete: 'set null' }),
+  authorName: text('author_name'),
+  authorEmail: text('author_email'),
+  message: text('message'),
+  committedAt: timestamp('committed_at', { withTimezone: true }),
+  additions: integer('additions').notNull().default(0),
+  deletions: integer('deletions').notNull().default(0),
+}, (t) => ({
+  devIdx: index('idx_git_commits_dev').on(t.developerId),
+  tsIdx: index('idx_git_commits_ts').on(t.committedAt),
+}));
+
+export const gitFileChanges = pgTable('git_file_changes', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  sha: text('sha').notNull().references(() => gitCommits.sha, { onDelete: 'cascade' }),
+  developerId: uuid('developer_id').references(() => users.id, { onDelete: 'set null' }),
+  filePath: text('file_path').notNull(),
+  moduleId: uuid('module_id').references(() => modules.id, { onDelete: 'set null' }),
+  additions: integer('additions').notNull().default(0),
+  deletions: integer('deletions').notNull().default(0),
+}, (t) => ({
+  devIdx: index('idx_gfc_dev').on(t.developerId),
+  fileIdx: index('idx_gfc_file').on(t.filePath),
+  modIdx: index('idx_gfc_module').on(t.moduleId),
+}));
+
 export const sessions = pgTable('sessions', {
   sessionId: text('session_id').primaryKey(),
   developerId: text('developer_id'),

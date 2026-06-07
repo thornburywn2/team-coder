@@ -1,12 +1,12 @@
 # Team Coder — Architecture
 
 > Commit this before writing feature code. Every AI session reads it first.
-> It is the anchor that stops five agents from inventing five incompatible
+> It is the anchor that stops the team's agents from inventing incompatible
 > designs. Keep it current; keep it short.
 
 ## What this is
 
-A coordination portal for a 5-person hackathon team where each coder drives AI
+A coordination portal for a hackathon team (any size) where each coder drives AI
 coding agents (Claude Code) on **one shared product**. The product is secondary;
 Team Coder is the **coordination layer** that makes the human+agent team legible
 to itself.
@@ -73,10 +73,12 @@ team-coder/
   `update_task_progress`, `complete_task`, `post_decision`, …). Humans steer by
   giving feedback in the portal; agents follow by reading MCP.
 
-## Team shape (2-2-1)
+## Team shape
 
-2 frontend · 2 backend · **1 Integrator** who owns merges, keeps this file +
-the spec current, drives deploy, and holds the demo narrative.
+Builders own vertical slices (a feature front-to-back) to minimize cross-file
+conflicts. Designate **one Integrator** — regardless of team size — who owns
+merges, keeps this file + the spec current, drives deploy, and holds the demo
+narrative. Scale the number of builders up or down freely.
 
 ## Module boundaries
 

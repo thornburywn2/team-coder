@@ -14,7 +14,8 @@
     "verify:ws": "bun run src/verify-ws.ts",
     "verify:hooks": "bun run src/simulate-hooks.ts",
     "verify:ownership": "bun run src/verify-ownership.ts",
-    "verify:mcp": "bun run src/verify-mcp.ts"
+    "verify:mcp": "bun run src/verify-mcp.ts",
+    "verify:gitpoll": "bun run src/verify-gitpoll.ts"
   },
   "dependencies": {
     "@team-coder/shared": "workspace:*",

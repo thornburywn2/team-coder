@@ -51,8 +51,8 @@ try {
   const fe = own.find((m) => m.pathPrefix === 'apps/web/');
   const be = own.find((m) => m.pathPrefix === 'apps/server/');
 
-  check(fe?.ownerName === 'Alice (Frontend)' && fe.inferred, `frontend auto-owned by Alice (got ${fe?.ownerName}, inferred=${fe?.inferred})`);
-  check(be?.ownerName === 'Bob (Frontend)' && be.inferred, `backend auto-owned by Bob (got ${be?.ownerName}, inferred=${be?.inferred})`);
+  check(fe?.ownerName === 'Alice' && fe.inferred, `frontend auto-owned by Alice (got ${fe?.ownerName}, inferred=${fe?.inferred})`);
+  check(be?.ownerName === 'Bob' && be.inferred, `backend auto-owned by Bob (got ${be?.ownerName}, inferred=${be?.inferred})`);
 } catch (err) {
   console.error('❌', err instanceof Error ? err.message : err);
   ok = false;

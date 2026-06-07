@@ -8,6 +8,13 @@
       "when": 1780869979260,
       "tag": "0000_normal_ikaris",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1780871980857,
+      "tag": "0001_jazzy_pestilence",
+      "breakpoints": true
     }
   ]
 }

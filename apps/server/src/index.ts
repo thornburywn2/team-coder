@@ -5,6 +5,7 @@ import { mcpRoutes } from './routes/mcp';
 import { wsRoute, websocket } from './ws';
 import { startDbListener } from './db/listener';
 import { refreshOwnership } from './ownership';
+import { pollGitOnce } from './git-poll';
 
 // ── Team Coder server (Bun runtime) ──────────────────────────────────────────
 // Mounts: /health, /api (REST, team-token gated), /ws (WebSocket fan-out).
@@ -42,6 +43,16 @@ const OWNERSHIP_POLL_MS = 30_000;
 const tick = () => refreshOwnership().catch((err) => console.error('[ownership] refresh failed:', err?.message ?? err));
 setInterval(tick, OWNERSHIP_POLL_MS);
 tick();
+
+// Poll the product repo (if configured) for git ground-truth; refresh ownership
+// when new commits land. No-op when PRODUCT_REPO_URL/PATH is unset.
+const GIT_POLL_MS = Number(process.env.PRODUCT_REPO_POLL_SECONDS ?? 300) * 1000;
+const gitTick = () =>
+  pollGitOnce()
+    .then((r) => { if (r.configured && r.newCommits) refreshOwnership(); })
+    .catch((err) => console.error('[git-poll] failed:', err?.message ?? err));
+setInterval(gitTick, GIT_POLL_MS);
+gitTick();
 
 console.log(`[team-coder] server listening on http://localhost:${port}`);
 

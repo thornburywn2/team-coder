@@ -1,4 +1,4 @@
-import { and, gte, isNotNull } from 'drizzle-orm';
+import { and, eq, gte, isNotNull } from 'drizzle-orm';
 import { db, schema } from './db';
 import { publish } from './state';
 
@@ -27,7 +27,7 @@ function norm(p: string): string {
 export async function computeOwnership(windowMinutes = 30): Promise<ModuleOwnership[]> {
   const since = new Date(Date.now() - windowMinutes * 60_000);
 
-  const [events, mods, users] = await Promise.all([
+  const [events, gitChanges, mods, users] = await Promise.all([
     db
       .select({
         developerId: schema.hookEvents.developerId,
@@ -41,6 +41,12 @@ export async function computeOwnership(windowMinutes = 30): Promise<ModuleOwners
           isNotNull(schema.hookEvents.developerId),
         ),
       ),
+    // git commits in the window are tool-agnostic ground truth; blend them in
+    db
+      .select({ developerId: schema.gitFileChanges.developerId, moduleId: schema.gitFileChanges.moduleId })
+      .from(schema.gitFileChanges)
+      .innerJoin(schema.gitCommits, eq(schema.gitFileChanges.sha, schema.gitCommits.sha))
+      .where(and(gte(schema.gitCommits.committedAt, since), isNotNull(schema.gitFileChanges.developerId))),
     db.select().from(schema.modules),
     db
       .select({ id: schema.users.id, displayName: schema.users.displayName, username: schema.users.username })
@@ -61,6 +67,12 @@ export async function computeOwnership(windowMinutes = 30): Promise<ModuleOwners
       const deepest = sortedMods.find((mm) => file.startsWith(mm.pathPrefix));
       if (deepest?.id !== m.id) continue;
       counts.set(e.developerId, (counts.get(e.developerId) ?? 0) + 1);
+    }
+    // blend git contributions (already mapped to a module at poll time)
+    for (const g of gitChanges) {
+      if (g.moduleId === m.id && g.developerId) {
+        counts.set(g.developerId, (counts.get(g.developerId) ?? 0) + 1);
+      }
     }
 
     const contributors = [...counts.entries()]
