@@ -100,3 +100,20 @@ slices (owner takes a feature front-to-back) minimize cross-file conflicts.
 P0 scaffold (this) → P1 DB+triggers → P2 Hono spine+WS → **P3 MVP** (hooks+board+
 feed+claim) → **P4** (MCP+ownership). M1+M2 are the committed core; proposals,
 inheritance, reuse kit, collision warning, deploy are stretch (M3/M4).
+
+## Deployment target
+
+The end state is **fully self-hosted via Docker** — at work, one
+`docker compose up` brings up the whole stack with no manual setup:
+
+- **`app` service** — a single Bun image. The web app is built (`vite build`) and
+  the Bun/Hono server **serves the static assets in production** + the API, WS,
+  and MCP endpoints. (In dev, the Vite dev server on 6301 proxies to Hono on 6300;
+  in prod there is only the app port.)
+- **`db` service** — Postgres 16 (the existing `docker-compose.yml`).
+
+Everything is **env-driven** (ports, `DATABASE_URL`, `TEAM_TOKEN`, per-dev tokens)
+so the same image is portable from this dev box to the work environment, where
+ports will differ. The app Dockerfile + combined compose are built in the deploy
+phase, but every earlier phase stays container-friendly (no host-specific paths,
+no hardcoded ports/hosts).
