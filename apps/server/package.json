@@ -10,7 +10,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/db/migrate.ts",
     "db:seed": "bun run src/db/seed.ts",
-    "db:verify": "bun run src/db/verify-notify.ts"
+    "db:verify": "bun run src/db/verify-notify.ts",
+    "verify:ws": "bun run src/verify-ws.ts"
   },
   "dependencies": {
     "@team-coder/shared": "workspace:*",

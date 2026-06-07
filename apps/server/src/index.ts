@@ -1,9 +1,12 @@
 import { Hono } from 'hono';
+import { apiRoutes } from './routes/api';
+import { wsRoute, websocket } from './ws';
+import { startDbListener } from './db/listener';
 
 // ── Team Coder server (Bun runtime) ──────────────────────────────────────────
-// P0 scaffold: boots a Hono app with a health check so the foundation runs.
-// Later phases mount: /hooks (ingest), /api (REST), /ws (WebSocket via
-// createBunWebSocket from 'hono/bun'), and /mcp (MCP server).
+// Mounts: /health, /api (REST, team-token gated), /ws (WebSocket fan-out).
+// Realtime spine: Postgres LISTEN/NOTIFY -> in-process bus -> WebSocket.
+// Later phases add /hooks (ingest) and /mcp (MCP server).
 
 const app = new Hono();
 
@@ -18,12 +21,22 @@ app.get('/health', (c) =>
   }),
 );
 
+app.route('/api', apiRoutes);
+app.get('/ws', wsRoute());
+
 const port = Number(process.env.PORT ?? 6300);
+
+// Start the realtime DB listener. Non-fatal if the DB is down so /health still
+// answers and the process stays up.
+startDbListener().catch((err) =>
+  console.error('[listener] failed to start (is the DB up?):', err?.message ?? err),
+);
 
 console.log(`[team-coder] server listening on http://localhost:${port}`);
 
-// Bun picks up this default export and serves it.
+// Bun serves this default export; `websocket` wires the WS handler.
 export default {
   port,
   fetch: app.fetch,
+  websocket,
 };
