@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { and, desc, eq, ilike, ne } from 'drizzle-orm';
+import { and, desc, eq, ilike, ne, or } from 'drizzle-orm';
 import { TASK_STATUS } from '@team-coder/shared';
 import { db, schema } from '../db';
 import type { Developer } from '../auth';
@@ -106,6 +106,47 @@ export function createMcpServer(dev: Developer): McpServer {
 
   // ── WRITE ──────────────────────────────────────────────────────────────────
   const feedBase = { developerId: dev.id, developer: me, color: dev.color ?? undefined };
+
+  server.registerTool(
+    'create_task',
+    {
+      description: 'Create a new task on the board — e.g. work you discovered or are breaking down. Optionally tie it to a module (by name or path prefix).',
+      inputSchema: { title: z.string(), description: z.string().optional(), module: z.string().optional() },
+    },
+    async ({ title, description, module }) => {
+      let moduleId: string | null = null;
+      if (module) {
+        const [m] = await db
+          .select({ id: schema.modules.id })
+          .from(schema.modules)
+          .where(or(eq(schema.modules.name, module), eq(schema.modules.pathPrefix, module)));
+        moduleId = m?.id ?? null;
+      }
+      const [row] = await db
+        .insert(schema.tasks)
+        .values({ title, description: description ?? null, moduleId, reporterId: dev.id })
+        .returning(TASK_FIELDS);
+      pushFeed({ ...feedBase, kind: 'created', detail: `created "${row!.title}"` });
+      return text({ ok: true, task: row });
+    },
+  );
+
+  server.registerTool(
+    'edit_task',
+    {
+      description: "Edit a task's title and/or description (rename or reword).",
+      inputSchema: { task_id: z.string(), title: z.string().optional(), description: z.string().optional() },
+    },
+    async ({ task_id, title, description }) => {
+      const patch: Record<string, unknown> = { updatedAt: new Date() };
+      if (title !== undefined) patch['title'] = title;
+      if (description !== undefined) patch['description'] = description;
+      const [row] = await db.update(schema.tasks).set(patch).where(eq(schema.tasks.id, task_id)).returning(TASK_FIELDS);
+      if (!row) return text({ error: 'task not found' });
+      pushFeed({ ...feedBase, kind: 'created', detail: `edited "${row.title}"` });
+      return text({ ok: true, task: row });
+    },
+  );
 
   server.registerTool(
     'claim_task',

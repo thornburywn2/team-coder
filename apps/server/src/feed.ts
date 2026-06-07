@@ -10,7 +10,7 @@ export interface FeedItem {
   developerId?: string;
   developer?: string;
   color?: string;
-  kind: 'session_start' | 'prompt' | 'edit' | 'stop' | 'subagent' | 'claim' | 'done' | 'blocked' | 'decision' | 'pattern';
+  kind: 'session_start' | 'prompt' | 'edit' | 'stop' | 'subagent' | 'claim' | 'done' | 'blocked' | 'decision' | 'pattern' | 'created';
   detail?: string;
   file?: string;
 }

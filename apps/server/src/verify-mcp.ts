@@ -32,7 +32,7 @@ try {
   await client.connect(transport);
 
   const tools = (await client.listTools()).tools.map((t) => t.name);
-  check(['get_my_tasks', 'claim_task', 'get_module_context', 'post_decision', 'add_shared_pattern'].every((t) => tools.includes(t)), `tools exposed (${tools.length}): ${tools.join(', ')}`);
+  check(['get_my_tasks', 'claim_task', 'create_task', 'edit_task', 'get_module_context', 'post_decision', 'add_shared_pattern'].every((t) => tools.includes(t)), `tools exposed (${tools.length}): ${tools.join(', ')}`);
 
   await client.callTool({ name: 'claim_task', arguments: { task_id: task.id } });
   const my = textOf((await client.callTool({ name: 'get_my_tasks', arguments: {} })) as never) as Array<{ id: string }>;
@@ -46,6 +46,16 @@ try {
   const resContents = (await client.readResource({ uri: 'project://my-context' })).contents[0] as { text: string };
   const ctx = JSON.parse(resContents.text) as { me: string };
   check(!!ctx.me, `resource project://my-context readable (me=${ctx.me})`);
+
+  // create_task + edit_task (the newly added write tools)
+  const created = textOf((await client.callTool({ name: 'create_task', arguments: { title: 'mcp-created task' } })) as never) as { ok: boolean; task?: { id: string } };
+  check(!!created.ok && !!created.task?.id, 'create_task created a task via MCP');
+  const restTasks = (await (await fetch(`${BASE}/api/tasks`, { headers: teamHeaders })).json()) as Array<{ id: string; title: string }>;
+  check(restTasks.some((t) => t.id === created.task?.id && t.title === 'mcp-created task'), 'created task visible in portal/REST');
+  if (created.task?.id) {
+    const edited = textOf((await client.callTool({ name: 'edit_task', arguments: { task_id: created.task.id, title: 'mcp-renamed task' } })) as never) as { ok: boolean };
+    check(!!edited.ok, 'edit_task renamed the task');
+  }
 
   await client.close();
 } catch (err) {

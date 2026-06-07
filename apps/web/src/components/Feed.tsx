@@ -11,6 +11,10 @@ const KIND_ICON: Record<string, string> = {
   stop: '⏸️',
   claim: '🙋',
   done: '✅',
+  created: '📝',
+  blocked: '🚧',
+  decision: '📐',
+  pattern: '🧩',
 };
 
 function ago(ts: number): string {
