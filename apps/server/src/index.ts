@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { apiRoutes } from './routes/api';
 import { hookRoutes } from './routes/hooks';
+import { mcpRoutes } from './routes/mcp';
 import { wsRoute, websocket } from './ws';
 import { startDbListener } from './db/listener';
 import { refreshOwnership } from './ownership';
@@ -25,6 +26,7 @@ app.get('/health', (c) =>
 
 app.route('/api', apiRoutes);
 app.route('/hooks', hookRoutes);
+app.route('/mcp', mcpRoutes);
 app.get('/ws', wsRoute());
 
 const port = Number(process.env.PORT ?? 6300);
