@@ -12,6 +12,7 @@
     "dev:server": "bun run --filter '@team-coder/server' dev",
     "dev:web": "bun run --filter '@team-coder/web' dev",
     "build": "bun run --filter '*' build",
+    "serve": "bun run --filter '@team-coder/web' build && bun run --filter '@team-coder/server' start",
     "typecheck": "bun run --filter '*' typecheck",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",

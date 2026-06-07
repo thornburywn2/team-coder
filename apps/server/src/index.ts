@@ -1,4 +1,7 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { Hono } from 'hono';
+import { serveStatic } from 'hono/bun';
 import { apiRoutes } from './routes/api';
 import { hookRoutes } from './routes/hooks';
 import { mcpRoutes } from './routes/mcp';
@@ -12,9 +15,13 @@ import { pollGitOnce } from './git-poll';
 // Realtime spine: Postgres LISTEN/NOTIFY -> in-process bus -> WebSocket.
 // Later phases add /hooks (ingest) and /mcp (MCP server).
 
-const app = new Hono();
+// In production / single-origin mode the server also serves the built web app,
+// so one port (bound to all interfaces) handles the SPA + API + WS + MCP — ideal
+// for LAN/VPN access and the container. WEB_DIST is relative to cwd (apps/server).
+const WEB_DIST = process.env.WEB_DIST ?? '../web/dist';
+const serveWeb = existsSync(resolve(WEB_DIST));
 
-app.get('/', (c) => c.text('Team Coder server — see /health'));
+const app = new Hono();
 
 app.get('/health', (c) =>
   c.json({
@@ -29,6 +36,15 @@ app.route('/api', apiRoutes);
 app.route('/hooks', hookRoutes);
 app.route('/mcp', mcpRoutes);
 app.get('/ws', wsRoute());
+
+if (serveWeb) {
+  // single-origin: serve built assets, with SPA fallback to index.html.
+  // Registered after the API routes so those always win.
+  app.use('*', serveStatic({ root: WEB_DIST }));
+  app.get('*', serveStatic({ path: 'index.html', root: WEB_DIST }));
+} else {
+  app.get('/', (c) => c.text('Team Coder server — see /health. (Web is served here in production; in dev use the Vite server.)'));
+}
 
 const port = Number(process.env.PORT ?? 6300);
 
@@ -54,7 +70,8 @@ const gitTick = () =>
 setInterval(gitTick, GIT_POLL_MS);
 gitTick();
 
-console.log(`[team-coder] server listening on http://localhost:${port}`);
+console.log(`[team-coder] server listening on http://0.0.0.0:${port}`);
+if (serveWeb) console.log(`[team-coder] serving web app (single-origin) from ${resolve(WEB_DIST)}`);
 
 // Bun serves this default export; `websocket` wires the WS handler.
 export default {
