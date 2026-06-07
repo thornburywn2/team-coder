@@ -63,7 +63,8 @@ header h1 { margin: 0; font-size: 1.25rem; }
 .logout { margin-left: auto; background: none; border: 1px solid var(--border); color: var(--muted); padding: 0.3rem 0.7rem; border-radius: 6px; cursor: pointer; }
 
 main { display: grid; grid-template-columns: 1fr 360px; gap: 1rem; align-items: start; }
-.col-main { display: flex; flex-direction: column; gap: 1rem; }
+.col-main, .col-side { display: flex; flex-direction: column; gap: 1rem; }
+.project-chip { font-size: 0.8rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--border); }
 
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; }
 .panel h2 { margin: 0 0 0.75rem; font-size: 0.95rem; display: flex; align-items: center; gap: 0.5rem; }
@@ -175,3 +176,32 @@ main { display: grid; grid-template-columns: 1fr 360px; gap: 1rem; align-items: 
 .conn-list .time { color: var(--gray); font-size: 0.72rem; width: 64px; text-align: right; }
 
 .muted { color: var(--muted); }
+
+/* ── Login extras (create project) ─────────────────────── */
+.link-btn { background: none !important; border: none !important; color: var(--accent); padding: 0.5rem 0 0 !important; width: auto !important; font-weight: 500; cursor: pointer; font-size: 0.85rem; }
+.created p { margin: 0 0 0.75rem; }
+.created label { display: block; margin-bottom: 0.4rem; color: var(--muted); }
+.created .codeblock { margin-bottom: 0.9rem; }
+.created button:not(.codeblock button) { width: 100%; padding: 0.6rem; border: none; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+
+/* ── Project header (board) ────────────────────────────── */
+.project-header .ph-top { display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.6rem; }
+.ph-id { display: flex; flex-direction: column; gap: 0.15rem; }
+.ph-name { margin: 0; font-size: 1.1rem; }
+.ph-repo { color: var(--accent); font-size: 0.78rem; text-decoration: none; }
+.ph-repo:hover { text-decoration: underline; }
+.ph-progress { margin-left: auto; text-align: right; display: flex; flex-direction: column; }
+.ph-pct { font-size: 1.4rem; font-weight: 700; color: var(--green); }
+.ph-prd { margin-top: 0.6rem; }
+.prd-body { background: #0b0d12; border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; margin: 0.5rem 0 0; font-size: 0.8rem; white-space: pre-wrap; word-break: break-word; max-height: 240px; overflow-y: auto; }
+
+/* ── Notes panel ───────────────────────────────────────── */
+.notes ul { list-style: none; margin: 0; padding: 0; }
+.notes li { padding: 0.5rem 0; border-top: 1px solid var(--border); }
+.new-note { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+.new-note input { flex: 1; padding: 0.45rem; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); }
+.new-note button { padding: 0.45rem 0.8rem; border: none; border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; }
+.note-head { display: flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; }
+.note-head .who { font-weight: 600; }
+.note-head .time { margin-left: auto; color: var(--gray); font-size: 0.7rem; }
+.note-body { margin: 0.3rem 0 0; font-size: 0.85rem; color: var(--text); word-break: break-word; white-space: pre-wrap; }

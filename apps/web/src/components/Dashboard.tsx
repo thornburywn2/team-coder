@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import type { WsMessage } from '@team-coder/shared';
-import { api, type FeedItem, type ModuleOwnership, type PresenceRow } from '../lib/api';
+import { api, type FeedItem, type ModuleOwnership, type PresenceRow, type ProjectInfo } from '../lib/api';
 import { queryClient } from '../lib/query';
 import { connectSocket, onMessage } from '../lib/socket';
 import { useStore } from '../store';
 import { Board } from './Board';
+import { ProjectHeader } from './ProjectHeader';
 import { Ownership } from './Ownership';
 import { Feed } from './Feed';
+import { Notes } from './Notes';
 import { Tasks } from './Tasks';
 import { Report } from './Report';
 import { Connect } from './Connect';
@@ -15,6 +18,7 @@ export function Dashboard() {
   const { token, connected, setConnected, hydratePresence, applyPresence, hydrateFeed, pushFeed, setOwnership, logout } =
     useStore();
   const [view, setView] = useState<'board' | 'report' | 'connect'>('board');
+  const { data: project } = useQuery({ queryKey: ['project'], queryFn: () => api<ProjectInfo>('/projects/current') });
 
   useEffect(() => {
     if (!token) return;
@@ -40,6 +44,9 @@ export function Dashboard() {
         case 'TASK_DELETED':
           void queryClient.invalidateQueries({ queryKey: ['tasks'] });
           break;
+        case 'NOTE_ADDED':
+          void queryClient.invalidateQueries({ queryKey: ['notes'] });
+          break;
         default:
           break;
       }
@@ -53,6 +60,7 @@ export function Dashboard() {
     <div className="app">
       <header>
         <h1>Team Coder</h1>
+        {project && <span className="project-chip">{project.name}</span>}
         <span className={`conn ${connected ? 'on' : 'off'}`}>{connected ? 'live' : 'connecting…'}</span>
         <nav className="view-tabs">
           <button className={view === 'board' ? 'active' : ''} onClick={() => setView('board')}>Board</button>
@@ -64,11 +72,13 @@ export function Dashboard() {
       {view === 'board' ? (
         <main>
           <div className="col-main">
+            <ProjectHeader />
             <Board />
             <Tasks />
           </div>
           <div className="col-side">
             <Ownership />
+            <Notes />
             <Feed />
           </div>
         </main>

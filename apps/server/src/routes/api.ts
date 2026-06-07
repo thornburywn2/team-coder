@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { db, schema } from '../db';
 import { teamAuth, type Project } from '../auth';
 import { getConnection, getConnections } from '../connections';
@@ -59,6 +59,30 @@ apiRoutes.get('/connect/:userId', async (c) => {
     .where(and(eq(schema.users.id, userId), eq(schema.users.projectId, c.get('project').id)));
   if (!u) return c.json({ error: 'unknown coder' }, 404);
   return c.json({ ...u, connection: getConnection(userId) });
+});
+
+// project notes — anyone on the project can post; the project_notes trigger
+// emits NOTE_ADDED over the WebSocket so the panel updates live for everyone.
+apiRoutes.get('/notes', async (c) =>
+  c.json(
+    await db
+      .select()
+      .from(schema.projectNotes)
+      .where(eq(schema.projectNotes.projectId, c.get('project').id))
+      .orderBy(desc(schema.projectNotes.createdAt))
+      .limit(100),
+  ),
+);
+
+apiRoutes.post('/notes', async (c) => {
+  const project = c.get('project');
+  const body = (await c.req.json().catch(() => ({}))) as { content?: string; authorId?: string };
+  if (!body.content?.trim()) return c.json({ error: 'content required' }, 400);
+  const [row] = await db
+    .insert(schema.projectNotes)
+    .values({ projectId: project.id, authorId: body.authorId ?? null, content: body.content.trim() })
+    .returning();
+  return c.json(row, 201);
 });
 
 // tasks: list / create / claim / done (taskRoutes reads the project from context)

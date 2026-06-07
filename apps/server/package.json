@@ -17,7 +17,8 @@
     "verify:mcp": "bun run src/verify-mcp.ts",
     "verify:gitpoll": "bun run src/verify-gitpoll.ts",
     "verify:report": "bun run src/verify-report.ts",
-    "verify:isolation": "bun run src/verify-isolation.ts"
+    "verify:isolation": "bun run src/verify-isolation.ts",
+    "verify:notes": "bun run src/verify-notes.ts"
   },
   "dependencies": {
     "@team-coder/shared": "workspace:*",

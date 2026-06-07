@@ -24,6 +24,41 @@ export interface User {
   color: string | null;
 }
 
+export interface ProjectInfo {
+  id: string;
+  name: string;
+  githubRepoUrl: string | null;
+  prd: string | null;
+}
+
+// returned once by POST /api/projects — the token is shown to the creator
+export interface CreatedProject {
+  id: string;
+  name: string;
+  token: string;
+  githubRepoUrl: string | null;
+}
+
+export interface Note {
+  id: string;
+  projectId: string;
+  authorId: string | null;
+  content: string;
+  pinned: boolean;
+  createdAt: string;
+}
+
+// Create a project (open — no token yet). Mints a fresh team token + seeds coders.
+export async function createProject(name: string, githubRepoUrl?: string): Promise<CreatedProject> {
+  const res = await fetch('/api/projects', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name, githubRepoUrl: githubRepoUrl || undefined }),
+  });
+  if (!res.ok) throw new Error(`Could not create project (${res.status})`);
+  return res.json() as Promise<CreatedProject>;
+}
+
 export interface PresenceRow {
   userId: string;
   status: 'active' | 'thinking' | 'idle' | 'offline';
