@@ -1,0 +1,29 @@
+# deps
+node_modules/
+.bun/
+
+# build output
+dist/
+build/
+*.tsbuildinfo
+
+# env / secrets
+.env
+.env.local
+.env.*.local
+
+# product repo clone (polled for ownership inference)
+.product-repo/
+
+# logs
+*.log
+logs/
+
+# editor / os
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# postgres volume (if bind-mounted)
+.pgdata/
