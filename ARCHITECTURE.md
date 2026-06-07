@@ -101,6 +101,30 @@ P0 scaffold (this) → P1 DB+triggers → P2 Hono spine+WS → **P3 MVP** (hooks
 feed+claim) → **P4** (MCP+ownership). M1+M2 are the committed core; proposals,
 inheritance, reuse kit, collision warning, deploy are stretch (M3/M4).
 
+## Client-agnostic ingestion (coders use different tools)
+
+Coders work however they like — Claude Code (CLI), Claude Desktop, Code Puppy,
+internal tools, or the web portal. Team Coder adapts via **three ingestion lanes
+that all feed one model**, in decreasing signal richness:
+
+1. **Hooks → `POST /hooks/event`** (richest): live presence, current file,
+   scrubbed prompt. Claude Code / Claude Desktop send these. The endpoint accepts
+   a generic event shape, so any tool or wrapper can emit to it (internal-tool
+   adapters).
+2. **MCP → `/mcp`** (universal): any MCP-capable client — Code Puppy (`/mcp`),
+   Claude Code/Desktop, Cursor, etc. — gets the read/write tools. MCP tool calls
+   themselves also drive presence/feed, so MCP-only clients appear live without
+   hooks.
+3. **Git poll** (tool-agnostic ground truth): a polled clone of the product repo
+   yields `git log`/`numstat` per author — works for *anyone who commits*,
+   regardless of tool. This is also the authoritative source for the contribution
+   report.
+
+The web portal is the fourth path: humans claim/update directly. Each coder picks
+their lane; the board, ownership, and stats merge all of them. Capability tiers
+and per-client setup live in `agent-kit/` (claude-code, claude-desktop,
+code-puppy, internal-tools, web).
+
 ## Deployment target
 
 The end state is **fully self-hosted via Docker** — at work, one
