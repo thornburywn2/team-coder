@@ -23,6 +23,8 @@ export const teamAuth = createMiddleware(async (c, next) => {
 export interface Developer {
   id: string;
   username: string;
+  displayName: string | null;
+  color: string | null;
 }
 
 /** Resolve a per-dev agent token to a developer; used by /hooks and /mcp (P3/P4). */
@@ -32,7 +34,12 @@ export const devAuth = createMiddleware<{ Variables: { developer: Developer } }>
     if (!token) return c.json({ error: 'missing agent token' }, 401);
 
     const [dev] = await db
-      .select({ id: schema.users.id, username: schema.users.username })
+      .select({
+        id: schema.users.id,
+        username: schema.users.username,
+        displayName: schema.users.displayName,
+        color: schema.users.color,
+      })
       .from(schema.users)
       .where(eq(schema.users.agentToken, token));
 

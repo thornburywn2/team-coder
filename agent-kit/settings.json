@@ -1,0 +1,87 @@
+{
+  "//": "Team Coder — Claude Code hook config. Each coder copies this into the PRODUCT repo's .claude/settings.json (committed) so the whole team streams activity to the portal. Set TEAM_CODER_URL and TEAM_CODER_TOKEN (your personal agent token) + DEVELOPER_ID in your shell profile.",
+  "//env": "export TEAM_CODER_URL=http://localhost:6300 ; export TEAM_CODER_TOKEN=dev-token-alice ; export DEVELOPER_ID=alice",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "${TEAM_CODER_URL}/hooks/event",
+            "timeout": 5,
+            "headers": {
+              "Authorization": "Bearer ${TEAM_CODER_TOKEN}",
+              "X-Developer-Id": "${DEVELOPER_ID}"
+            },
+            "allowedEnvVars": ["TEAM_CODER_URL", "TEAM_CODER_TOKEN", "DEVELOPER_ID"]
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "${TEAM_CODER_URL}/hooks/event",
+            "timeout": 5,
+            "headers": {
+              "Authorization": "Bearer ${TEAM_CODER_TOKEN}",
+              "X-Developer-Id": "${DEVELOPER_ID}"
+            },
+            "allowedEnvVars": ["TEAM_CODER_URL", "TEAM_CODER_TOKEN", "DEVELOPER_ID"]
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "${TEAM_CODER_URL}/hooks/event",
+            "timeout": 5,
+            "headers": {
+              "Authorization": "Bearer ${TEAM_CODER_TOKEN}",
+              "X-Developer-Id": "${DEVELOPER_ID}"
+            },
+            "allowedEnvVars": ["TEAM_CODER_URL", "TEAM_CODER_TOKEN", "DEVELOPER_ID"]
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "${TEAM_CODER_URL}/hooks/event",
+            "timeout": 5,
+            "headers": {
+              "Authorization": "Bearer ${TEAM_CODER_TOKEN}",
+              "X-Developer-Id": "${DEVELOPER_ID}"
+            },
+            "allowedEnvVars": ["TEAM_CODER_URL", "TEAM_CODER_TOKEN", "DEVELOPER_ID"]
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "${TEAM_CODER_URL}/hooks/event",
+            "timeout": 5,
+            "headers": {
+              "Authorization": "Bearer ${TEAM_CODER_TOKEN}",
+              "X-Developer-Id": "${DEVELOPER_ID}"
+            },
+            "allowedEnvVars": ["TEAM_CODER_URL", "TEAM_CODER_TOKEN", "DEVELOPER_ID"]
+          }
+        ]
+      }
+    ]
+  }
+}

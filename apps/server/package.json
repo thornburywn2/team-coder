@@ -11,7 +11,8 @@
     "db:migrate": "bun run src/db/migrate.ts",
     "db:seed": "bun run src/db/seed.ts",
     "db:verify": "bun run src/db/verify-notify.ts",
-    "verify:ws": "bun run src/verify-ws.ts"
+    "verify:ws": "bun run src/verify-ws.ts",
+    "verify:hooks": "bun run src/simulate-hooks.ts"
   },
   "dependencies": {
     "@team-coder/shared": "workspace:*",
