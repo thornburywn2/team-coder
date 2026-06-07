@@ -18,7 +18,7 @@ mcpRoutes.use('*', devAuth);
 mcpRoutes.all('/', async (c) => {
   const dev = c.get('developer');
   // record liveness + light up presence so the agent shows as connected/active
-  touchMcp(dev.id);
+  touchMcp(dev.id, dev.projectId);
   void db
     .update(schema.userPresence)
     .set({ status: 'active', lastSeen: new Date() })

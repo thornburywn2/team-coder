@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { and, eq } from 'drizzle-orm';
 import { db, queryClient, schema } from './db';
 import { computeOwnership } from './ownership';
-import { pollGitOnce } from './git-poll';
+import { pollGitRepo } from './git-poll';
 
 // P10 git-poll acceptance check: build a throwaway product repo with commits by
 // a known author, run the poller, and assert commits/file-changes are ingested,
@@ -34,13 +34,16 @@ try {
   git(['add', '-A']);
   git(['commit', '-q', '-m', 'feat: extend foo']);
 
-  process.env.PRODUCT_REPO_PATH = dir;
-  delete process.env.PRODUCT_REPO_URL; // use the local repo as-is, no clone/pull
+  // resolve the default project (seeded) and ingest the throwaway repo into it
+  const DEFAULT_TOKEN = process.env.TEAM_TOKEN ?? 'change-me-team-token';
+  const [proj] = await db.select({ id: schema.projects.id }).from(schema.projects).where(eq(schema.projects.token, DEFAULT_TOKEN));
+  if (!proj) throw new Error('default project not found — run db:seed first');
+  const projectId = proj.id;
 
-  const res = await pollGitOnce();
+  const res = await pollGitRepo({ projectId, repoDir: dir }); // local repo as-is, no clone/pull
   check(res.configured && res.newCommits >= 2, `ingested >=2 commits (got ${res.newCommits})`);
 
-  const [carol] = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.email, 'carol@teamcoder.dev'));
+  const [carol] = await db.select({ id: schema.users.id }).from(schema.users).where(and(eq(schema.users.email, 'carol@teamcoder.dev'), eq(schema.users.projectId, projectId)));
   const commits = await db
     .select({ developerId: schema.gitCommits.developerId, additions: schema.gitCommits.additions })
     .from(schema.gitCommits)
@@ -53,10 +56,10 @@ try {
     .from(schema.gitFileChanges)
     .innerJoin(schema.gitCommits, eq(schema.gitFileChanges.sha, schema.gitCommits.sha))
     .where(and(eq(schema.gitCommits.authorEmail, 'carol@teamcoder.dev')));
-  const sharedMod = (await db.select().from(schema.modules).where(eq(schema.modules.pathPrefix, 'packages/shared/')))[0];
+  const sharedMod = (await db.select().from(schema.modules).where(and(eq(schema.modules.projectId, projectId), eq(schema.modules.pathPrefix, 'packages/shared/'))))[0];
   check(changes.some((c) => c.moduleId === sharedMod?.id), 'file changes mapped to the shared module');
 
-  const ownership = await computeOwnership();
+  const ownership = await computeOwnership(projectId);
   const shared = ownership.find((m) => m.pathPrefix === 'packages/shared/');
   check(shared?.ownerName === 'Carol' && shared.inferred, `shared auto-owned by Carol via git (got ${shared?.ownerName})`);
 } catch (err) {

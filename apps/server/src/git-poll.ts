@@ -1,12 +1,17 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { eq, isNotNull } from 'drizzle-orm';
 import { db, schema } from './db';
 
-// Tool-agnostic ground truth: poll a clone of the product repo and ingest
-// `git log --numstat` into git_commits + git_file_changes, mapping each commit
-// author to a coder (by email, then name) and each file to a module. Works for
-// anyone who commits, regardless of which agent/tool they use. Also the
-// authoritative LOC source for the contribution report.
+// Tool-agnostic ground truth: for each project that has a githubRepoUrl, poll a
+// clone of its product repo and ingest `git log --numstat` into git_commits +
+// git_file_changes, mapping each commit author to one of that project's coders
+// (by email, then name) and each file to one of that project's modules. Works for
+// anyone who commits, regardless of which agent/tool they use. Everything is
+// scoped by project_id so repos never cross-contaminate.
+//
+// Auto-cloning is opt-in (ENABLE_GIT_POLL=1) so local dev stays a no-op by
+// default; at deploy time the work environment flips it on per its product repos.
 
 function git(cwd: string, args: string[]): { ok: boolean; out: string } {
   const proc = Bun.spawnSync(['git', ...args], { cwd });
@@ -22,21 +27,30 @@ function norm(p: string): string {
 }
 
 export interface GitPollResult {
+  projectId: string;
   configured: boolean;
   newCommits: number;
 }
 
-export async function pollGitOnce(): Promise<GitPollResult> {
-  const repoPath = process.env.PRODUCT_REPO_PATH ?? '.product-repo';
-  const repoUrl = process.env.PRODUCT_REPO_URL ?? '';
-  const repoDir = resolve(repoPath);
+/**
+ * Poll one project's repo at `repoDir` and ingest its history, scoped to that
+ * project. If `repoUrl` is given, clone (first time) or pull (ff-only). Author →
+ * coder and file → module mapping only ever considers THIS project's rows.
+ */
+export async function pollGitRepo(opts: {
+  projectId: string;
+  repoDir: string;
+  repoUrl?: string;
+}): Promise<GitPollResult> {
+  const { projectId, repoUrl } = opts;
+  const repoDir = resolve(opts.repoDir);
 
   if (!isGitRepo(repoDir)) {
-    if (!repoUrl) return { configured: false, newCommits: 0 };
+    if (!repoUrl) return { projectId, configured: false, newCommits: 0 };
     const clone = git(process.cwd(), ['clone', '--quiet', repoUrl, repoDir]);
     if (!clone.ok) {
-      console.error('[git-poll] clone failed');
-      return { configured: true, newCommits: 0 };
+      console.error(`[git-poll] clone failed for project ${projectId}`);
+      return { projectId, configured: true, newCommits: 0 };
     }
   } else if (repoUrl) {
     git(repoDir, ['pull', '--quiet', '--ff-only']);
@@ -45,9 +59,10 @@ export async function pollGitOnce(): Promise<GitPollResult> {
   const [users, mods, existing] = await Promise.all([
     db
       .select({ id: schema.users.id, email: schema.users.email, username: schema.users.username, displayName: schema.users.displayName })
-      .from(schema.users),
-    db.select().from(schema.modules),
-    db.select({ sha: schema.gitCommits.sha }).from(schema.gitCommits),
+      .from(schema.users)
+      .where(eq(schema.users.projectId, projectId)),
+    db.select().from(schema.modules).where(eq(schema.modules.projectId, projectId)),
+    db.select({ sha: schema.gitCommits.sha }).from(schema.gitCommits).where(eq(schema.gitCommits.projectId, projectId)),
   ]);
 
   const seen = new Set(existing.map((e) => e.sha));
@@ -63,7 +78,7 @@ export async function pollGitOnce(): Promise<GitPollResult> {
 
   const SEP = '\x1e';
   const log = git(repoDir, ['log', '--no-merges', '-n', '1000', '--numstat', `--pretty=format:${SEP}%H|%an|%ae|%aI|%s`]);
-  if (!log.ok) return { configured: true, newCommits: 0 };
+  if (!log.ok) return { projectId, configured: true, newCommits: 0 };
 
   const records = log.out.split(SEP).map((s) => s.trim()).filter(Boolean);
   let newCommits = 0;
@@ -94,6 +109,7 @@ export async function pollGitOnce(): Promise<GitPollResult> {
       .insert(schema.gitCommits)
       .values({
         sha,
+        projectId,
         developerId: devId,
         authorName: authorName || null,
         authorEmail: authorEmail || null,
@@ -105,11 +121,35 @@ export async function pollGitOnce(): Promise<GitPollResult> {
       .onConflictDoNothing();
 
     if (files.length) {
-      await db.insert(schema.gitFileChanges).values(files.map((f) => ({ sha, developerId: devId, ...f })));
+      await db.insert(schema.gitFileChanges).values(files.map((f) => ({ sha, projectId, developerId: devId, ...f })));
     }
     newCommits++;
   }
 
-  if (newCommits) console.log(`[git-poll] ${newCommits} new commit(s) ingested from ${repoDir}`);
-  return { configured: true, newCommits };
+  if (newCommits) console.log(`[git-poll] ${newCommits} new commit(s) ingested for project ${projectId} from ${repoDir}`);
+  return { projectId, configured: true, newCommits };
+}
+
+/**
+ * Poll every project that has a configured repo. Opt-in via ENABLE_GIT_POLL so
+ * local dev (where the Default Project points at the team-coder repo) doesn't
+ * trigger surprise network clones. Each project's clone lives in its own subdir.
+ */
+export async function pollGitAll(): Promise<GitPollResult[]> {
+  if (process.env.ENABLE_GIT_POLL !== '1' && process.env.ENABLE_GIT_POLL !== 'true') return [];
+
+  const baseDir = process.env.PRODUCT_REPOS_DIR ?? '.product-repos';
+  const projects = await db
+    .select({ id: schema.projects.id, githubRepoUrl: schema.projects.githubRepoUrl })
+    .from(schema.projects)
+    .where(isNotNull(schema.projects.githubRepoUrl));
+
+  const results: GitPollResult[] = [];
+  for (const p of projects) {
+    if (!p.githubRepoUrl) continue;
+    results.push(
+      await pollGitRepo({ projectId: p.id, repoDir: resolve(baseDir, p.id), repoUrl: p.githubRepoUrl }),
+    );
+  }
+  return results;
 }

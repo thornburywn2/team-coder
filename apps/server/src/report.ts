@@ -48,34 +48,34 @@ export interface Report {
 
 const num = (v: unknown): number => Number(v ?? 0);
 
-export async function buildReport(generatedAt: string): Promise<Report> {
+export async function buildReport(projectId: string, generatedAt: string): Promise<Report> {
   const [users, gitAgg, filesAgg, modLinesAgg, editAgg, sessAgg, taskAgg, adrAgg, patAgg, timelineAgg, ownership] =
     await Promise.all([
-      db.select({ id: schema.users.id, name: schema.users.displayName, username: schema.users.username, color: schema.users.color }).from(schema.users),
+      db.select({ id: schema.users.id, name: schema.users.displayName, username: schema.users.username, color: schema.users.color }).from(schema.users).where(eq(schema.users.projectId, projectId)),
       db
         .select({ dev: schema.gitCommits.developerId, commits: sql<number>`count(distinct ${schema.gitCommits.sha})`, added: sql<number>`coalesce(sum(${schema.gitCommits.additions}),0)`, removed: sql<number>`coalesce(sum(${schema.gitCommits.deletions}),0)` })
-        .from(schema.gitCommits).where(isNotNull(schema.gitCommits.developerId)).groupBy(schema.gitCommits.developerId),
+        .from(schema.gitCommits).where(and(eq(schema.gitCommits.projectId, projectId), isNotNull(schema.gitCommits.developerId))).groupBy(schema.gitCommits.developerId),
       db
         .select({ dev: schema.gitFileChanges.developerId, files: sql<number>`count(distinct ${schema.gitFileChanges.filePath})` })
-        .from(schema.gitFileChanges).where(isNotNull(schema.gitFileChanges.developerId)).groupBy(schema.gitFileChanges.developerId),
+        .from(schema.gitFileChanges).where(and(eq(schema.gitFileChanges.projectId, projectId), isNotNull(schema.gitFileChanges.developerId))).groupBy(schema.gitFileChanges.developerId),
       db
         .select({ moduleId: schema.gitFileChanges.moduleId, dev: schema.gitFileChanges.developerId, lines: sql<number>`coalesce(sum(${schema.gitFileChanges.additions}),0)` })
-        .from(schema.gitFileChanges).where(and(isNotNull(schema.gitFileChanges.moduleId), isNotNull(schema.gitFileChanges.developerId))).groupBy(schema.gitFileChanges.moduleId, schema.gitFileChanges.developerId),
+        .from(schema.gitFileChanges).where(and(eq(schema.gitFileChanges.projectId, projectId), isNotNull(schema.gitFileChanges.moduleId), isNotNull(schema.gitFileChanges.developerId))).groupBy(schema.gitFileChanges.moduleId, schema.gitFileChanges.developerId),
       db
         .select({ dev: schema.hookEvents.developerId, n: count() })
-        .from(schema.hookEvents).where(and(isNotNull(schema.hookEvents.developerId), inArray(schema.hookEvents.toolName, ['Write', 'Edit', 'NotebookEdit']))).groupBy(schema.hookEvents.developerId),
+        .from(schema.hookEvents).where(and(eq(schema.hookEvents.projectId, projectId), isNotNull(schema.hookEvents.developerId), inArray(schema.hookEvents.toolName, ['Write', 'Edit', 'NotebookEdit']))).groupBy(schema.hookEvents.developerId),
       db
         .select({ dev: schema.sessions.developerId, minutes: sql<number>`coalesce(sum(extract(epoch from (${schema.sessions.lastSeenAt} - ${schema.sessions.startedAt})))/60,0)`, tools: sql<number>`coalesce(sum(${schema.sessions.toolCount}),0)`, prompts: sql<number>`coalesce(sum(${schema.sessions.promptCount}),0)` })
-        .from(schema.sessions).where(isNotNull(schema.sessions.developerId)).groupBy(schema.sessions.developerId),
+        .from(schema.sessions).where(and(eq(schema.sessions.projectId, projectId), isNotNull(schema.sessions.developerId))).groupBy(schema.sessions.developerId),
       db
         .select({ dev: schema.tasks.assigneeId, n: count() })
-        .from(schema.tasks).where(and(eq(schema.tasks.status, 'done'), isNotNull(schema.tasks.assigneeId))).groupBy(schema.tasks.assigneeId),
-      db.select({ dev: schema.adrs.authorId, n: count() }).from(schema.adrs).where(isNotNull(schema.adrs.authorId)).groupBy(schema.adrs.authorId),
-      db.select({ dev: schema.codePatterns.authorId, n: count() }).from(schema.codePatterns).where(isNotNull(schema.codePatterns.authorId)).groupBy(schema.codePatterns.authorId),
+        .from(schema.tasks).where(and(eq(schema.tasks.projectId, projectId), eq(schema.tasks.status, 'done'), isNotNull(schema.tasks.assigneeId))).groupBy(schema.tasks.assigneeId),
+      db.select({ dev: schema.adrs.authorId, n: count() }).from(schema.adrs).where(and(eq(schema.adrs.projectId, projectId), isNotNull(schema.adrs.authorId))).groupBy(schema.adrs.authorId),
+      db.select({ dev: schema.codePatterns.authorId, n: count() }).from(schema.codePatterns).where(and(eq(schema.codePatterns.projectId, projectId), isNotNull(schema.codePatterns.authorId))).groupBy(schema.codePatterns.authorId),
       db
         .select({ bucket: sql<string>`to_char(date_trunc('hour', ${schema.hookEvents.ts}), 'YYYY-MM-DD"T"HH24:00')`, dev: schema.hookEvents.developerId, n: count() })
-        .from(schema.hookEvents).where(isNotNull(schema.hookEvents.developerId)).groupBy(sql`1`, schema.hookEvents.developerId).orderBy(sql`1`),
-      computeOwnership(60 * 24 * 14), // 2-week window: "owned" for the whole event
+        .from(schema.hookEvents).where(and(eq(schema.hookEvents.projectId, projectId), isNotNull(schema.hookEvents.developerId))).groupBy(sql`1`, schema.hookEvents.developerId).orderBy(sql`1`),
+      computeOwnership(projectId, 60 * 24 * 14), // 2-week window: "owned" for the whole event
     ]);
 
   const byDev = <T extends { dev: string | null }>(rows: T[]) => new Map(rows.filter((r) => r.dev).map((r) => [r.dev as string, r]));

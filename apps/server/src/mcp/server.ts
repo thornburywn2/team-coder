@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { and, desc, eq, ilike, ne, or } from 'drizzle-orm';
+import { and, desc, eq, ilike, ne, or, type SQL } from 'drizzle-orm';
 import { TASK_STATUS } from '@team-coder/shared';
 import { db, schema } from '../db';
 import type { Developer } from '../auth';
@@ -28,6 +28,9 @@ const TASK_FIELDS = {
 export function createMcpServer(dev: Developer): McpServer {
   const server = new McpServer({ name: 'team-coder', version: '1.0.0' });
   const me = dev.displayName ?? dev.username;
+  const pid = dev.projectId; // every query/write is scoped to the coder's project
+  // task lives in this project — guards every id-addressed write against cross-project access
+  const inProject = (extra?: SQL) => and(eq(schema.tasks.projectId, pid), extra);
 
   // ── READ ───────────────────────────────────────────────────────────────────
   server.registerTool(
@@ -37,7 +40,7 @@ export function createMcpServer(dev: Developer): McpServer {
       const rows = await db
         .select(TASK_FIELDS)
         .from(schema.tasks)
-        .where(and(eq(schema.tasks.assigneeId, dev.id), ne(schema.tasks.status, 'done')));
+        .where(and(eq(schema.tasks.projectId, pid), eq(schema.tasks.assigneeId, dev.id), ne(schema.tasks.status, 'done')));
       return text(rows);
     },
   );
@@ -49,13 +52,13 @@ export function createMcpServer(dev: Developer): McpServer {
       inputSchema: { module: z.string().describe('module name or path prefix, e.g. "backend" or "apps/server/"') },
     },
     async ({ module }) => {
-      const ownership = await computeOwnership();
+      const ownership = await computeOwnership(pid);
       const mod = ownership.find((m) => m.name === module || m.pathPrefix === module || m.pathPrefix.startsWith(module));
       if (!mod) return text({ error: `no module matching "${module}"` });
       const tasks = await db
         .select(TASK_FIELDS)
         .from(schema.tasks)
-        .where(and(eq(schema.tasks.moduleId, mod.moduleId), ne(schema.tasks.status, 'done')));
+        .where(inProject(and(eq(schema.tasks.moduleId, mod.moduleId), ne(schema.tasks.status, 'done'))));
       return text({ module: mod.name, pathPrefix: mod.pathPrefix, owner: mod.ownerName, inferred: mod.inferred, contributors: mod.contributors, activeTasks: tasks });
     },
   );
@@ -67,6 +70,7 @@ export function createMcpServer(dev: Developer): McpServer {
       const rows = await db
         .select({ id: schema.codePatterns.id, title: schema.codePatterns.title, description: schema.codePatterns.description, language: schema.codePatterns.language, tags: schema.codePatterns.tags, code: schema.codePatterns.codeSnippet })
         .from(schema.codePatterns)
+        .where(eq(schema.codePatterns.projectId, pid))
         .orderBy(desc(schema.codePatterns.createdAt))
         .limit(25);
       const filtered = tag ? rows.filter((r) => r.tags?.includes(tag)) : rows;
@@ -81,6 +85,7 @@ export function createMcpServer(dev: Developer): McpServer {
       const rows = await db
         .select({ id: schema.adrs.id, seq: schema.adrs.sequenceNum, title: schema.adrs.title, decision: schema.adrs.decision, status: schema.adrs.status })
         .from(schema.adrs)
+        .where(eq(schema.adrs.projectId, pid))
         .orderBy(desc(schema.adrs.createdAt))
         .limit(20);
       return text(rows);
@@ -91,13 +96,13 @@ export function createMcpServer(dev: Developer): McpServer {
     'search_tasks',
     { description: 'Search tasks by text and/or status.', inputSchema: { query: z.string().optional(), status: z.enum(TASK_STATUS).optional() } },
     async ({ query, status }) => {
-      const conds = [];
+      const conds = [eq(schema.tasks.projectId, pid)];
       if (query) conds.push(ilike(schema.tasks.title, `%${query}%`));
       if (status) conds.push(eq(schema.tasks.status, status));
       const rows = await db
         .select(TASK_FIELDS)
         .from(schema.tasks)
-        .where(conds.length ? and(...conds) : undefined)
+        .where(and(...conds))
         .orderBy(desc(schema.tasks.createdAt))
         .limit(25);
       return text(rows);
@@ -119,14 +124,14 @@ export function createMcpServer(dev: Developer): McpServer {
         const [m] = await db
           .select({ id: schema.modules.id })
           .from(schema.modules)
-          .where(or(eq(schema.modules.name, module), eq(schema.modules.pathPrefix, module)));
+          .where(and(eq(schema.modules.projectId, pid), or(eq(schema.modules.name, module), eq(schema.modules.pathPrefix, module))));
         moduleId = m?.id ?? null;
       }
       const [row] = await db
         .insert(schema.tasks)
-        .values({ title, description: description ?? null, moduleId, reporterId: dev.id })
+        .values({ projectId: pid, title, description: description ?? null, moduleId, reporterId: dev.id })
         .returning(TASK_FIELDS);
-      pushFeed({ ...feedBase, kind: 'created', detail: `created "${row!.title}"` });
+      pushFeed(pid, { ...feedBase, kind: 'created', detail: `created "${row!.title}"` });
       return text({ ok: true, task: row });
     },
   );
@@ -141,9 +146,9 @@ export function createMcpServer(dev: Developer): McpServer {
       const patch: Record<string, unknown> = { updatedAt: new Date() };
       if (title !== undefined) patch['title'] = title;
       if (description !== undefined) patch['description'] = description;
-      const [row] = await db.update(schema.tasks).set(patch).where(eq(schema.tasks.id, task_id)).returning(TASK_FIELDS);
+      const [row] = await db.update(schema.tasks).set(patch).where(inProject(eq(schema.tasks.id, task_id))).returning(TASK_FIELDS);
       if (!row) return text({ error: 'task not found' });
-      pushFeed({ ...feedBase, kind: 'created', detail: `edited "${row.title}"` });
+      pushFeed(pid, { ...feedBase, kind: 'created', detail: `edited "${row.title}"` });
       return text({ ok: true, task: row });
     },
   );
@@ -152,9 +157,9 @@ export function createMcpServer(dev: Developer): McpServer {
     'claim_task',
     { description: 'Claim a task for yourself (soft, non-blocking). Marks it in_progress.', inputSchema: { task_id: z.string() } },
     async ({ task_id }) => {
-      const [row] = await db.update(schema.tasks).set({ assigneeId: dev.id, status: 'in_progress', updatedAt: new Date() }).where(eq(schema.tasks.id, task_id)).returning(TASK_FIELDS);
+      const [row] = await db.update(schema.tasks).set({ assigneeId: dev.id, status: 'in_progress', updatedAt: new Date() }).where(inProject(eq(schema.tasks.id, task_id))).returning(TASK_FIELDS);
       if (!row) return text({ error: 'task not found' });
-      pushFeed({ ...feedBase, kind: 'claim', detail: `claimed "${row.title}"` });
+      pushFeed(pid, { ...feedBase, kind: 'claim', detail: `claimed "${row.title}"` });
       return text({ ok: true, task: row });
     },
   );
@@ -169,18 +174,18 @@ export function createMcpServer(dev: Developer): McpServer {
       const [u] = await db
         .select({ id: schema.users.id, displayName: schema.users.displayName, username: schema.users.username })
         .from(schema.users)
-        .where(or(eq(schema.users.username, assignee), eq(schema.users.displayName, assignee)));
+        .where(and(eq(schema.users.projectId, pid), or(eq(schema.users.username, assignee), eq(schema.users.displayName, assignee))));
       if (!u) {
-        const all = await db.select({ username: schema.users.username }).from(schema.users);
+        const all = await db.select({ username: schema.users.username }).from(schema.users).where(eq(schema.users.projectId, pid));
         return text({ error: `no coder named "${assignee}"`, available: all.map((a) => a.username) });
       }
       const [row] = await db
         .update(schema.tasks)
         .set({ assigneeId: u.id, updatedAt: new Date() })
-        .where(eq(schema.tasks.id, task_id))
+        .where(inProject(eq(schema.tasks.id, task_id)))
         .returning(TASK_FIELDS);
       if (!row) return text({ error: 'task not found' });
-      pushFeed({ ...feedBase, kind: 'claim', detail: `assigned "${row.title}" to ${u.displayName ?? u.username}` });
+      pushFeed(pid, { ...feedBase, kind: 'claim', detail: `assigned "${row.title}" to ${u.displayName ?? u.username}` });
       return text({ ok: true, task: row, assignedTo: u.displayName ?? u.username });
     },
   );
@@ -189,9 +194,9 @@ export function createMcpServer(dev: Developer): McpServer {
     'update_task_progress',
     { description: 'Update a task status and optionally add a progress note.', inputSchema: { task_id: z.string(), status: z.enum(TASK_STATUS), note: z.string().optional() } },
     async ({ task_id, status, note }) => {
-      const [row] = await db.update(schema.tasks).set({ status, updatedAt: new Date() }).where(eq(schema.tasks.id, task_id)).returning(TASK_FIELDS);
+      const [row] = await db.update(schema.tasks).set({ status, updatedAt: new Date() }).where(inProject(eq(schema.tasks.id, task_id))).returning(TASK_FIELDS);
       if (!row) return text({ error: 'task not found' });
-      pushFeed({ ...feedBase, kind: status === 'done' ? 'done' : 'claim', detail: `${status.replace('_', ' ')}: "${row.title}"${note ? ` — ${note}` : ''}` });
+      pushFeed(pid, { ...feedBase, kind: status === 'done' ? 'done' : 'claim', detail: `${status.replace('_', ' ')}: "${row.title}"${note ? ` — ${note}` : ''}` });
       return text({ ok: true, task: row });
     },
   );
@@ -200,9 +205,9 @@ export function createMcpServer(dev: Developer): McpServer {
     'complete_task',
     { description: 'Mark a task done with a short summary of what you did.', inputSchema: { task_id: z.string(), summary: z.string().optional() } },
     async ({ task_id, summary }) => {
-      const [row] = await db.update(schema.tasks).set({ status: 'done', updatedAt: new Date() }).where(eq(schema.tasks.id, task_id)).returning(TASK_FIELDS);
+      const [row] = await db.update(schema.tasks).set({ status: 'done', updatedAt: new Date() }).where(inProject(eq(schema.tasks.id, task_id))).returning(TASK_FIELDS);
       if (!row) return text({ error: 'task not found' });
-      pushFeed({ ...feedBase, kind: 'done', detail: `completed "${row.title}"${summary ? ` — ${summary}` : ''}` });
+      pushFeed(pid, { ...feedBase, kind: 'done', detail: `completed "${row.title}"${summary ? ` — ${summary}` : ''}` });
       return text({ ok: true, task: row });
     },
   );
@@ -211,9 +216,9 @@ export function createMcpServer(dev: Developer): McpServer {
     'flag_blocker',
     { description: 'Flag a task as blocked with a reason so the team sees it.', inputSchema: { task_id: z.string(), reason: z.string() } },
     async ({ task_id, reason }) => {
-      const [row] = await db.update(schema.tasks).set({ status: 'blocked', updatedAt: new Date() }).where(eq(schema.tasks.id, task_id)).returning(TASK_FIELDS);
+      const [row] = await db.update(schema.tasks).set({ status: 'blocked', updatedAt: new Date() }).where(inProject(eq(schema.tasks.id, task_id))).returning(TASK_FIELDS);
       if (!row) return text({ error: 'task not found' });
-      pushFeed({ ...feedBase, kind: 'blocked', detail: `blocked "${row.title}": ${reason}` });
+      pushFeed(pid, { ...feedBase, kind: 'blocked', detail: `blocked "${row.title}": ${reason}` });
       return text({ ok: true, task: row });
     },
   );
@@ -222,8 +227,8 @@ export function createMcpServer(dev: Developer): McpServer {
     'post_decision',
     { description: 'Record an architecture decision (ADR) so the team does not relitigate it.', inputSchema: { title: z.string(), context: z.string(), decision: z.string(), consequences: z.string().optional() } },
     async ({ title, context, decision, consequences }) => {
-      const [row] = await db.insert(schema.adrs).values({ title, context, decision, consequences: consequences ?? null, status: 'accepted', authorId: dev.id }).returning({ id: schema.adrs.id, seq: schema.adrs.sequenceNum });
-      pushFeed({ ...feedBase, kind: 'decision', detail: `decision: ${title}` });
+      const [row] = await db.insert(schema.adrs).values({ projectId: pid, title, context, decision, consequences: consequences ?? null, status: 'accepted', authorId: dev.id }).returning({ id: schema.adrs.id, seq: schema.adrs.sequenceNum });
+      pushFeed(pid, { ...feedBase, kind: 'decision', detail: `decision: ${title}` });
       return text({ ok: true, adr: row });
     },
   );
@@ -232,8 +237,8 @@ export function createMcpServer(dev: Developer): McpServer {
     'add_shared_pattern',
     { description: 'Publish a reusable code pattern so teammates do not rebuild it.', inputSchema: { title: z.string(), code: z.string(), description: z.string().optional(), language: z.string().optional(), tags: z.array(z.string()).optional() } },
     async ({ title, code, description, language, tags }) => {
-      const [row] = await db.insert(schema.codePatterns).values({ title, codeSnippet: code, description: description ?? null, language: language ?? null, tags: tags ?? [], authorId: dev.id }).returning({ id: schema.codePatterns.id });
-      pushFeed({ ...feedBase, kind: 'pattern', detail: `shared pattern: ${title}` });
+      const [row] = await db.insert(schema.codePatterns).values({ projectId: pid, title, codeSnippet: code, description: description ?? null, language: language ?? null, tags: tags ?? [], authorId: dev.id }).returning({ id: schema.codePatterns.id });
+      pushFeed(pid, { ...feedBase, kind: 'pattern', detail: `shared pattern: ${title}` });
       return text({ ok: true, pattern: row });
     },
   );
@@ -245,9 +250,9 @@ export function createMcpServer(dev: Developer): McpServer {
     { description: 'Live project snapshot: open task count, blockers, recent decisions, module owners.', mimeType: 'application/json' },
     async (uri) => {
       const [tasks, ownership, decisions] = await Promise.all([
-        db.select(TASK_FIELDS).from(schema.tasks).where(ne(schema.tasks.status, 'done')),
-        computeOwnership(),
-        db.select({ title: schema.adrs.title, decision: schema.adrs.decision }).from(schema.adrs).orderBy(desc(schema.adrs.createdAt)).limit(5),
+        db.select(TASK_FIELDS).from(schema.tasks).where(inProject(ne(schema.tasks.status, 'done'))),
+        computeOwnership(pid),
+        db.select({ title: schema.adrs.title, decision: schema.adrs.decision }).from(schema.adrs).where(eq(schema.adrs.projectId, pid)).orderBy(desc(schema.adrs.createdAt)).limit(5),
       ]);
       const data = {
         openTasks: tasks.length,
@@ -265,8 +270,8 @@ export function createMcpServer(dev: Developer): McpServer {
     { description: 'Your personalized context: your open tasks and the modules you own.', mimeType: 'application/json' },
     async (uri) => {
       const [myTasks, ownership] = await Promise.all([
-        db.select(TASK_FIELDS).from(schema.tasks).where(and(eq(schema.tasks.assigneeId, dev.id), ne(schema.tasks.status, 'done'))),
-        computeOwnership(),
+        db.select(TASK_FIELDS).from(schema.tasks).where(and(eq(schema.tasks.projectId, pid), eq(schema.tasks.assigneeId, dev.id), ne(schema.tasks.status, 'done'))),
+        computeOwnership(pid),
       ]);
       const data = {
         me: me,

@@ -14,20 +14,23 @@ interface Notification {
   id: string;
 }
 
+// Deletes only carry an id (the row is already gone), so they can't be tagged
+// with a projectId — they broadcast to everyone and clients harmlessly ignore an
+// unknown id. Every non-delete message is tagged from its row for project scoping.
 async function toMessage(n: Notification): Promise<WsMessage | null> {
   switch (n.table) {
     case 'tasks': {
       if (n.op === 'DELETE') return { type: 'TASK_DELETED', payload: { id: n.id } };
       const [row] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, n.id));
       if (!row) return null;
-      return { type: n.op === 'INSERT' ? 'TASK_CREATED' : 'TASK_UPDATED', payload: row };
+      return { type: n.op === 'INSERT' ? 'TASK_CREATED' : 'TASK_UPDATED', payload: row, meta: { projectId: row.projectId ?? undefined } };
     }
     case 'activity_events': {
       const [row] = await db
         .select()
         .from(schema.activityEvents)
         .where(eq(schema.activityEvents.id, n.id));
-      return row ? { type: 'ACTIVITY_EVENT', payload: row } : null;
+      return row ? { type: 'ACTIVITY_EVENT', payload: row, meta: { projectId: row.projectId ?? undefined } } : null;
     }
     case 'user_presence': {
       if (n.op === 'DELETE') {
@@ -37,12 +40,17 @@ async function toMessage(n: Notification): Promise<WsMessage | null> {
         .select()
         .from(schema.userPresence)
         .where(eq(schema.userPresence.userId, n.id));
-      return row ? { type: 'PRESENCE_UPDATE', payload: row, meta: { developerId: row.userId } } : null;
+      return row ? { type: 'PRESENCE_UPDATE', payload: row, meta: { developerId: row.userId, projectId: row.projectId ?? undefined } } : null;
     }
     case 'proposals': {
       if (n.op === 'DELETE') return { type: 'PROPOSAL_UPDATED', payload: { id: n.id } };
       const [row] = await db.select().from(schema.proposals).where(eq(schema.proposals.id, n.id));
-      return row ? { type: 'PROPOSAL_UPDATED', payload: row } : null;
+      return row ? { type: 'PROPOSAL_UPDATED', payload: row, meta: { projectId: row.projectId ?? undefined } } : null;
+    }
+    case 'project_notes': {
+      if (n.op === 'DELETE') return null;
+      const [row] = await db.select().from(schema.projectNotes).where(eq(schema.projectNotes.id, n.id));
+      return row ? { type: 'NOTE_ADDED', payload: row, meta: { projectId: row.projectId ?? undefined } } : null;
     }
     default:
       return null; // votes/comments/modules handled in later phases

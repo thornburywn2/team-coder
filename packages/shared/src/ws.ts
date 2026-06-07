@@ -12,6 +12,7 @@ export const WS_SERVER_MSG = [
   'OWNERSHIP_UPDATE',
   'COLLISION_WARNING',
   'PROPOSAL_UPDATED',
+  'NOTE_ADDED', // a project note was posted (project_notes insert)
 ] as const;
 export type WsServerMsgType = (typeof WS_SERVER_MSG)[number];
 
@@ -27,6 +28,7 @@ export interface WsMessage<T = unknown> {
   payload?: T;
   meta?: {
     developerId?: string;
+    projectId?: string; // isolation tag — sockets only receive their project's deltas
     ts?: number;
   };
 }

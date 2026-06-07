@@ -3,12 +3,13 @@ import { resolve } from 'node:path';
 import { Hono } from 'hono';
 import { serveStatic } from 'hono/bun';
 import { apiRoutes } from './routes/api';
+import { publicProjectRoutes } from './routes/projects';
 import { hookRoutes } from './routes/hooks';
 import { mcpRoutes } from './routes/mcp';
 import { wsRoute, websocket } from './ws';
 import { startDbListener } from './db/listener';
 import { refreshOwnership } from './ownership';
-import { pollGitOnce } from './git-poll';
+import { pollGitAll } from './git-poll';
 
 // ── Team Coder server (Bun runtime) ──────────────────────────────────────────
 // Mounts: /health, /api (REST, team-token gated), /ws (WebSocket fan-out).
@@ -32,6 +33,9 @@ app.get('/health', (c) =>
   }),
 );
 
+// Project creation is open (no token yet) and must be matched before the
+// team-token-gated /api router, so register it first.
+app.route('/api/projects', publicProjectRoutes);
 app.route('/api', apiRoutes);
 app.route('/hooks', hookRoutes);
 app.route('/mcp', mcpRoutes);
@@ -64,8 +68,8 @@ tick();
 // when new commits land. No-op when PRODUCT_REPO_URL/PATH is unset.
 const GIT_POLL_MS = Number(process.env.PRODUCT_REPO_POLL_SECONDS ?? 300) * 1000;
 const gitTick = () =>
-  pollGitOnce()
-    .then((r) => { if (r.configured && r.newCommits) refreshOwnership(); })
+  pollGitAll()
+    .then((results) => { if (results.some((r) => r.newCommits > 0)) refreshOwnership(); })
     .catch((err) => console.error('[git-poll] failed:', err?.message ?? err));
 setInterval(gitTick, GIT_POLL_MS);
 gitTick();

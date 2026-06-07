@@ -22,7 +22,7 @@ hookRoutes.post('/event', async (c) => {
   const parsed = HookEventSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: 'invalid hook payload' }, 400);
 
-  touchHook(dev.id); // record hook-lane liveness for the connection indicator
+  touchHook(dev.id, dev.projectId); // record hook-lane liveness for the indicator
 
   // Fire-and-forget: kick off the writes and return immediately so the agent is
   // never blocked (hard <50ms target). The inserts run concurrently inside ingest.
@@ -61,6 +61,7 @@ async function ingest(dev: Developer, ev: HookEventPayload): Promise<void> {
 
   await Promise.all([
     db.insert(schema.hookEvents).values({
+      projectId: dev.projectId,
       sessionId: ev.session_id,
       developerId: dev.id,
       project,
@@ -73,7 +74,7 @@ async function ingest(dev: Developer, ev: HookEventPayload): Promise<void> {
     }),
     db
       .insert(schema.sessions)
-      .values({ sessionId: ev.session_id, developerId: dev.id, project })
+      .values({ sessionId: ev.session_id, projectId: dev.projectId, developerId: dev.id, project })
       .onConflictDoUpdate({
         target: schema.sessions.sessionId,
         set: {
@@ -86,7 +87,7 @@ async function ingest(dev: Developer, ev: HookEventPayload): Promise<void> {
   ]);
 
   const feed = feedFor(dev, ev, file, scrubbedPrompt);
-  if (feed) pushFeed(feed);
+  if (feed) pushFeed(dev.projectId, feed);
 }
 
 function feedFor(
@@ -94,7 +95,7 @@ function feedFor(
   ev: HookEventPayload,
   file: string | undefined,
   prompt: string | undefined,
-): (Omit<FeedItem, 'id' | 'ts'>) | null {
+): (Omit<FeedItem, 'id' | 'ts' | 'projectId'>) | null {
   const base = { developerId: dev.id, developer: dev.displayName ?? dev.username, color: dev.color ?? undefined };
   switch (ev.hook_event_name) {
     case 'SessionStart':

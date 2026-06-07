@@ -24,7 +24,7 @@ function norm(p: string): string {
   return p.replace(/^\.\//, '').replace(/^\/+/, '');
 }
 
-export async function computeOwnership(windowMinutes = 30): Promise<ModuleOwnership[]> {
+export async function computeOwnership(projectId: string, windowMinutes = 30): Promise<ModuleOwnership[]> {
   const since = new Date(Date.now() - windowMinutes * 60_000);
 
   const [events, gitChanges, mods, users] = await Promise.all([
@@ -36,6 +36,7 @@ export async function computeOwnership(windowMinutes = 30): Promise<ModuleOwners
       .from(schema.hookEvents)
       .where(
         and(
+          eq(schema.hookEvents.projectId, projectId),
           gte(schema.hookEvents.ts, since),
           isNotNull(schema.hookEvents.filePath),
           isNotNull(schema.hookEvents.developerId),
@@ -46,11 +47,12 @@ export async function computeOwnership(windowMinutes = 30): Promise<ModuleOwners
       .select({ developerId: schema.gitFileChanges.developerId, moduleId: schema.gitFileChanges.moduleId })
       .from(schema.gitFileChanges)
       .innerJoin(schema.gitCommits, eq(schema.gitFileChanges.sha, schema.gitCommits.sha))
-      .where(and(gte(schema.gitCommits.committedAt, since), isNotNull(schema.gitFileChanges.developerId))),
-    db.select().from(schema.modules),
+      .where(and(eq(schema.gitFileChanges.projectId, projectId), gte(schema.gitCommits.committedAt, since), isNotNull(schema.gitFileChanges.developerId))),
+    db.select().from(schema.modules).where(eq(schema.modules.projectId, projectId)),
     db
       .select({ id: schema.users.id, displayName: schema.users.displayName, username: schema.users.username })
-      .from(schema.users),
+      .from(schema.users)
+      .where(eq(schema.users.projectId, projectId)),
   ]);
 
   const nameOf = new Map(users.map((u) => [u.id, u.displayName ?? u.username]));
@@ -92,8 +94,11 @@ export async function computeOwnership(windowMinutes = 30): Promise<ModuleOwners
   });
 }
 
-/** Recompute and broadcast ownership to all connected clients. */
+/** Recompute and broadcast ownership for every project (each tagged for its sockets). */
 export async function refreshOwnership(): Promise<void> {
-  const ownership = await computeOwnership();
-  publish({ type: 'OWNERSHIP_UPDATE', payload: ownership });
+  const projects = await db.select({ id: schema.projects.id }).from(schema.projects);
+  for (const p of projects) {
+    const ownership = await computeOwnership(p.id);
+    publish({ type: 'OWNERSHIP_UPDATE', payload: ownership, meta: { projectId: p.id } });
+  }
 }

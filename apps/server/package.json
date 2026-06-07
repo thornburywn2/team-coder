@@ -16,7 +16,8 @@
     "verify:ownership": "bun run src/verify-ownership.ts",
     "verify:mcp": "bun run src/verify-mcp.ts",
     "verify:gitpoll": "bun run src/verify-gitpoll.ts",
-    "verify:report": "bun run src/verify-report.ts"
+    "verify:report": "bun run src/verify-report.ts",
+    "verify:isolation": "bun run src/verify-isolation.ts"
   },
   "dependencies": {
     "@team-coder/shared": "workspace:*",
