@@ -95,6 +95,7 @@ try {
 
   // validation
   check((await jpost(T, `/api/proposals/${proposalId}/vote`, { voterId: v0?.id, vote: 'maybe' })).status === 400, 'invalid vote → 400');
+  check((await jpost(T, `/api/proposals/${proposalId}/vote`, { voterId: '00000000-0000-0000-0000-000000000000', vote: 'approve' })).status === 400, 'unknown voter → 400 (not a 500 FK error)');
   check((await jpost(T, '/api/comments', { targetType: 'task', targetId: task.id, authorId: v0?.id })).status === 400, 'empty comment → 400');
 } catch (err) {
   console.error('❌', err instanceof Error ? err.message : err);

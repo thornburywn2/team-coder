@@ -4,6 +4,7 @@ import { db, schema } from '../db';
 import { teamAuth, type Project } from '../auth';
 import { getConnection, getConnections } from '../connections';
 import { recentCollisions } from '../collisions';
+import { activeLocks } from '../locks';
 import { recentFeed } from '../feed';
 import { computeOwnership } from '../ownership';
 import { buildReport } from '../report';
@@ -120,6 +121,18 @@ apiRoutes.get('/usage', async (c) => {
   return c.json({ coders, total: coders.reduce((s, c2) => s + c2.total, 0) });
 });
 
+// token-usage trend — tokens per day (from session rollups, by last-seen day) so
+// the team can watch spend over time and drive it down.
+apiRoutes.get('/usage/trend', async (c) => {
+  const pid = c.get('project').id;
+  const rows = await db.select({ ts: schema.sessions.lastSeenAt, tin: schema.sessions.inputTokens, tout: schema.sessions.outputTokens }).from(schema.sessions).where(and(eq(schema.sessions.projectId, pid), isNotNull(schema.sessions.developerId)));
+  const day = (d: Date | string) => new Date(d).toISOString().slice(0, 10);
+  const m = new Map<string, number>();
+  for (const r of rows) m.set(day(r.ts), (m.get(day(r.ts)) ?? 0) + Number(r.tin) + Number(r.tout));
+  const series = [...m.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([date, tokens]) => ({ date, tokens }));
+  return c.json({ series, total: series.reduce((s, p) => s + p.tokens, 0) });
+});
+
 // burndown — daily cumulative scope vs done (and remaining) over the project, so
 // the team sees momentum toward the goal. Approximate completion time = updatedAt
 // of done tasks; scope grows as tasks are added.
@@ -147,6 +160,9 @@ apiRoutes.get('/feed', async (c) => c.json(await recentFeed(c.get('project').id)
 
 // advisory concurrent-edit warnings (active, non-expired) for this project
 apiRoutes.get('/collisions', (c) => c.json(recentCollisions(c.get('project').id)));
+
+// active cooperative work-locks (who's holding which file right now)
+apiRoutes.get('/locks', (c) => c.json(activeLocks(c.get('project').id)));
 
 // team AWARDS — a positive "leaderboard": everyone gets an award reflecting a real
 // strength (nothing negative). Built from the full contribution report + live

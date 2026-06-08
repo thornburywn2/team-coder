@@ -21,6 +21,8 @@ import { RepoStatus } from './RepoStatus';
 import { Burndown } from './Burndown';
 import { MyWork } from './MyWork';
 import { StaleTasks } from './StaleTasks';
+import { TokenTrend } from './TokenTrend';
+import { Locks } from './Locks';
 import { Report } from './Report';
 import { Decisions } from './Proposals';
 import { Patterns } from './Patterns';
@@ -32,6 +34,13 @@ export function Dashboard() {
     useStore();
   const [view, setView] = useState<'board' | 'report' | 'connect'>('board');
   const { data: project } = useQuery({ queryKey: ['project'], queryFn: () => api<ProjectInfo>('/projects/current') });
+  const meId = useStore((s) => s.meId);
+  // if our stored identity is no longer in this project's roster (e.g. the project
+  // was re-seeded), drop it so the user re-picks — avoids stale-id write failures.
+  const { data: roster } = useQuery({ queryKey: ['users'], queryFn: () => api<{ id: string }[]>('/users') });
+  useEffect(() => {
+    if (roster && meId && !roster.some((u) => u.id === meId)) logout();
+  }, [roster, meId, logout]);
 
   useEffect(() => {
     if (!token) return;
@@ -114,14 +123,20 @@ export function Dashboard() {
             <Kpis />
           </div>
           <div className="board-grid">
-            {/* Elevated: the most important work + what needs the engineer's attention */}
-            <div className="w12 section-label" title="The important items, elevated: your priority work, what's blocked, and what's gone quiet">⭐ Needs your attention</div>
-            <div className="w4"><MyWork /></div>
-            <div className="w4"><Blockers /></div>
-            <div className="w4"><StaleTasks /></div>
+            {/* Elevated: communication + the most important work, front and center */}
+            <div className="w12 section-label" title="Communication + the important items: team notes, your work, what's blocked, what's gone quiet">⭐ Needs your attention</div>
+            <div className="w6"><Notes /></div>
+            <div className="w6"><MyWork /></div>
+            <div className="w6"><Blockers /></div>
+            <div className="w6"><StaleTasks /></div>
+
+            {/* Trends: progress + spend over time */}
+            <div className="w12 section-label" title="Progress and token spend over time">📈 Trends</div>
+            <div className="w6"><Burndown /></div>
+            <div className="w6"><TokenTrend /></div>
 
             {/* The work: who's on what, the full backlog, decisions, context */}
-            <div className="w12 section-label" title="Live team activity, the full backlog, and decisions in flight">📋 The work</div>
+            <div className="w12 section-label" title="Live team activity, the full backlog, decisions, and coordination">📋 The work</div>
             <div className="w8"><Board /></div>
             <div className="w4"><LiveAgents /></div>
             <div className="w8"><Tasks /></div>
@@ -131,18 +146,14 @@ export function Dashboard() {
             </div>
             <div className="w6"><ProposalsWidget /></div>
             <div className="w6"><Decisions /></div>
-            <div className="w6"><Notes /></div>
             <div className="w6"><Feed /></div>
             <div className="w6"><Awards /></div>
             <div className="w6"><TokenUsage /></div>
+            <div className="w6"><Locks /></div>
 
             {/* Reuse kit — the shared pattern library, folded onto the board */}
             <div className="w12 section-label" title="Reusable code patterns — pull before you rebuild">🧩 Reuse kit</div>
             <div className="w12"><Patterns /></div>
-
-            {/* Trends: larger charts live at the bottom */}
-            <div className="w12 section-label" title="Progress over time — larger charts live here">📈 Trends</div>
-            <div className="w12"><Burndown /></div>
           </div>
         </div>
       ) : view === 'report' ? (

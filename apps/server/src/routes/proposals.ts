@@ -63,12 +63,14 @@ proposalRoutes.post('/:id/vote', async (c) => {
   if (!body.vote || !VOTE_VALUE.includes(body.vote as never)) return c.json({ error: 'invalid vote' }, 400);
   const [prop] = await db.select({ id: schema.proposals.id, title: schema.proposals.title }).from(schema.proposals).where(and(eq(schema.proposals.id, id), eq(schema.proposals.projectId, project.id)));
   if (!prop) return c.json({ error: 'proposal not found' }, 404);
+  // validate the voter belongs to this project (avoids a FK 500 on a stale id)
+  const voter = await actorName(project.id, body.voterId);
+  if (!voter) return c.json({ error: 'unknown voter — please log in again' }, 400);
   await db
     .insert(schema.votes)
     .values({ projectId: project.id, proposalId: id, voterId: body.voterId, vote: body.vote as never, comment: body.comment?.trim() || null })
     .onConflictDoUpdate({ target: [schema.votes.proposalId, schema.votes.voterId], set: { vote: body.vote as never, comment: body.comment?.trim() || null } });
-  const u = await actorName(project.id, body.voterId);
-  pushFeed(project.id, { developerId: u?.id, developer: u?.displayName ?? u?.username, color: u?.color ?? undefined, kind: 'vote', detail: `voted ${body.vote} on "${prop.title}"` });
+  pushFeed(project.id, { developerId: voter.id, developer: voter.displayName ?? voter.username, color: voter.color ?? undefined, kind: 'vote', detail: `voted ${body.vote} on "${prop.title}"` });
   return c.json({ ok: true });
 });
 

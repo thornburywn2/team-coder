@@ -338,6 +338,16 @@ export function getBurndown() {
   return api<Burndown>('/burndown');
 }
 
+export interface TokenTrend { series: { date: string; tokens: number }[]; total: number }
+export function getTokenTrend() {
+  return api<TokenTrend>('/usage/trend');
+}
+
+export interface Lock { file: string; holderId: string; holderName: string; ts: number }
+export function getLocks() {
+  return api<Lock[]>('/locks');
+}
+
 export interface CollisionWarning {
   file: string;
   developers: { id: string; name: string }[];

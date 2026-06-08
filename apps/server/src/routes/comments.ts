@@ -33,6 +33,9 @@ commentRoutes.post('/', async (c) => {
   if (!body.targetId) return c.json({ error: 'targetId required' }, 400);
   if (!body.content?.trim()) return c.json({ error: 'content required' }, 400);
   if (!body.authorId) return c.json({ error: 'authorId required' }, 400);
+  // validate author belongs to this project (avoids a FK 500 on a stale id)
+  const [author] = await db.select({ id: schema.users.id }).from(schema.users).where(and(eq(schema.users.id, body.authorId), eq(schema.users.projectId, project.id)));
+  if (!author) return c.json({ error: 'unknown author — please log in again' }, 400);
   const [row] = await db
     .insert(schema.comments)
     .values({ projectId: project.id, authorId: body.authorId, targetType: body.targetType as never, targetId: body.targetId, parentId: body.parentId ?? null, content: body.content.trim() })
