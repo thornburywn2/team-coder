@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api, type Breakdown, type Report as ReportData } from '../lib/api';
 import { downloadFile, reportToMarkdown } from '../lib/report-export';
@@ -32,7 +33,8 @@ function BreakdownBars({ title, hint, items, unit }: { title: string; hint: stri
 // module breakdown by LOC, activity timeline. Exportable (JSON/Markdown/print).
 
 export function Report() {
-  const { data: report, isLoading } = useQuery({ queryKey: ['report'], queryFn: () => api<ReportData>('/report') });
+  const [days, setDays] = useState(0); // 0 = all time
+  const { data: report, isLoading } = useQuery({ queryKey: ['report', days], queryFn: () => api<ReportData>(`/report${days ? `?days=${days}` : ''}`) });
 
   if (isLoading || !report) {
     return (
@@ -51,6 +53,13 @@ export function Report() {
         <h2>
           Contribution report
           <span className="report-actions">
+            <select value={days} onChange={(e) => setDays(Number(e.target.value))} title="Time range for activity metrics (commits, sessions, tasks completed, timeline). LOC/module breakdown is cumulative.">
+              <option value={0}>All time</option>
+              <option value={30}>Last 30 days</option>
+              <option value={14}>Last 14 days</option>
+              <option value={7}>Last 7 days</option>
+              <option value={1}>Last 24 hours</option>
+            </select>
             <button onClick={() => downloadFile('team-coder-report.json', JSON.stringify(report, null, 2), 'application/json')}>JSON</button>
             <button onClick={() => downloadFile('team-coder-report.md', reportToMarkdown(report), 'text/markdown')}>Markdown</button>
             <button onClick={() => window.print()}>Print / PDF</button>

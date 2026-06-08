@@ -119,6 +119,7 @@ export const tasks = pgTable('tasks', {
   reporterId: uuid('reporter_id').references(() => users.id, { onDelete: 'set null' }),
   moduleId: uuid('module_id').references(() => modules.id, { onDelete: 'set null' }),
   filePaths: jsonb('file_paths').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  completedAt: timestamp('completed_at', { withTimezone: true }), // set when status → done (accurate burndown)
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({

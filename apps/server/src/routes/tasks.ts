@@ -92,7 +92,7 @@ taskRoutes.post('/:id/claim', async (c) => {
   const { userId } = (await c.req.json().catch(() => ({}))) as { userId?: string };
   const [row] = await db
     .update(schema.tasks)
-    .set({ assigneeId: userId ?? null, status: 'in_progress', updatedAt: new Date() })
+    .set({ assigneeId: userId ?? null, status: 'in_progress', completedAt: null, updatedAt: new Date() })
     .where(and(eq(schema.tasks.id, id), eq(schema.tasks.projectId, project.id)))
     .returning();
   if (!row) return c.json({ error: 'task not found' }, 404);
@@ -113,7 +113,7 @@ taskRoutes.post('/:id/done', async (c) => {
   const { userId } = (await c.req.json().catch(() => ({}))) as { userId?: string };
   const [row] = await db
     .update(schema.tasks)
-    .set({ status: 'done', updatedAt: new Date() })
+    .set({ status: 'done', completedAt: new Date(), updatedAt: new Date() })
     .where(and(eq(schema.tasks.id, id), eq(schema.tasks.projectId, project.id)))
     .returning();
   if (!row) return c.json({ error: 'task not found' }, 404);

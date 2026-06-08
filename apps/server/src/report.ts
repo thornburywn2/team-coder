@@ -1,4 +1,4 @@
-import { and, count, eq, inArray, isNotNull, sql } from 'drizzle-orm';
+import { and, count, eq, gte, inArray, isNotNull, sql } from 'drizzle-orm';
 import { db, schema } from './db';
 import { computeOwnership } from './ownership';
 import { languageOf, layerOf } from './lib/classify';
@@ -65,13 +65,19 @@ export interface Report {
 
 const num = (v: unknown): number => Number(v ?? 0);
 
-export async function buildReport(projectId: string, generatedAt: string): Promise<Report> {
+export async function buildReport(projectId: string, generatedAt: string, opts: { sinceDays?: number } = {}): Promise<Report> {
+  // optional time window: when set, activity-based metrics (commits, sessions, tasks
+  // completed, edits, timeline) only count events since the cutoff. The LOC/module
+  // breakdown stays cumulative (it has no per-row timestamp). drizzle's and() drops
+  // undefined args, so `since(col)` is a no-op when no window is given.
+  const tcut = opts.sinceDays && opts.sinceDays > 0 ? new Date(Date.now() - opts.sinceDays * 86_400_000) : null;
+  const since = (col: Parameters<typeof gte>[0]) => (tcut ? gte(col, tcut) : undefined);
   const [users, gitAgg, filesAgg, modLinesAgg, editAgg, sessAgg, taskAgg, adrAgg, patAgg, timelineAgg, ownership, extra1, extra2, extra3] =
     await Promise.all([
       db.select({ id: schema.users.id, name: schema.users.displayName, username: schema.users.username, color: schema.users.color }).from(schema.users).where(eq(schema.users.projectId, projectId)),
       db
         .select({ dev: schema.gitCommits.developerId, commits: sql<number>`count(distinct ${schema.gitCommits.sha})`, added: sql<number>`coalesce(sum(${schema.gitCommits.additions}),0)`, removed: sql<number>`coalesce(sum(${schema.gitCommits.deletions}),0)` })
-        .from(schema.gitCommits).where(and(eq(schema.gitCommits.projectId, projectId), isNotNull(schema.gitCommits.developerId))).groupBy(schema.gitCommits.developerId),
+        .from(schema.gitCommits).where(and(eq(schema.gitCommits.projectId, projectId), isNotNull(schema.gitCommits.developerId), since(schema.gitCommits.committedAt))).groupBy(schema.gitCommits.developerId),
       db
         .select({ dev: schema.gitFileChanges.developerId, files: sql<number>`count(distinct ${schema.gitFileChanges.filePath})` })
         .from(schema.gitFileChanges).where(and(eq(schema.gitFileChanges.projectId, projectId), isNotNull(schema.gitFileChanges.developerId))).groupBy(schema.gitFileChanges.developerId),
@@ -80,18 +86,20 @@ export async function buildReport(projectId: string, generatedAt: string): Promi
         .from(schema.gitFileChanges).where(and(eq(schema.gitFileChanges.projectId, projectId), isNotNull(schema.gitFileChanges.moduleId), isNotNull(schema.gitFileChanges.developerId))).groupBy(schema.gitFileChanges.moduleId, schema.gitFileChanges.developerId),
       db
         .select({ dev: schema.hookEvents.developerId, n: count() })
-        .from(schema.hookEvents).where(and(eq(schema.hookEvents.projectId, projectId), isNotNull(schema.hookEvents.developerId), inArray(schema.hookEvents.toolName, ['Write', 'Edit', 'NotebookEdit']))).groupBy(schema.hookEvents.developerId),
+        .from(schema.hookEvents).where(and(eq(schema.hookEvents.projectId, projectId), isNotNull(schema.hookEvents.developerId), inArray(schema.hookEvents.toolName, ['Write', 'Edit', 'NotebookEdit']), since(schema.hookEvents.ts))).groupBy(schema.hookEvents.developerId),
       db
-        .select({ dev: schema.sessions.developerId, minutes: sql<number>`coalesce(sum(extract(epoch from (${schema.sessions.lastSeenAt} - ${schema.sessions.startedAt})))/60,0)`, tools: sql<number>`coalesce(sum(${schema.sessions.toolCount}),0)`, prompts: sql<number>`coalesce(sum(${schema.sessions.promptCount}),0)`, tokensIn: sql<number>`coalesce(sum(${schema.sessions.inputTokens}),0)`, tokensOut: sql<number>`coalesce(sum(${schema.sessions.outputTokens}),0)` })
-        .from(schema.sessions).where(and(eq(schema.sessions.projectId, projectId), isNotNull(schema.sessions.developerId))).groupBy(schema.sessions.developerId),
+        // cap each session at 4h so an abandoned (never-Stopped) session can't
+        // inflate "active minutes" — a more honest figure than raw span.
+        .select({ dev: schema.sessions.developerId, minutes: sql<number>`coalesce(sum(least(extract(epoch from (${schema.sessions.lastSeenAt} - ${schema.sessions.startedAt})), 14400))/60,0)`, tools: sql<number>`coalesce(sum(${schema.sessions.toolCount}),0)`, prompts: sql<number>`coalesce(sum(${schema.sessions.promptCount}),0)`, tokensIn: sql<number>`coalesce(sum(${schema.sessions.inputTokens}),0)`, tokensOut: sql<number>`coalesce(sum(${schema.sessions.outputTokens}),0)` })
+        .from(schema.sessions).where(and(eq(schema.sessions.projectId, projectId), isNotNull(schema.sessions.developerId), since(schema.sessions.lastSeenAt))).groupBy(schema.sessions.developerId),
       db
         .select({ dev: schema.tasks.assigneeId, n: count() })
-        .from(schema.tasks).where(and(eq(schema.tasks.projectId, projectId), eq(schema.tasks.status, 'done'), isNotNull(schema.tasks.assigneeId))).groupBy(schema.tasks.assigneeId),
+        .from(schema.tasks).where(and(eq(schema.tasks.projectId, projectId), eq(schema.tasks.status, 'done'), isNotNull(schema.tasks.assigneeId), since(schema.tasks.completedAt))).groupBy(schema.tasks.assigneeId),
       db.select({ dev: schema.adrs.authorId, n: count() }).from(schema.adrs).where(and(eq(schema.adrs.projectId, projectId), isNotNull(schema.adrs.authorId))).groupBy(schema.adrs.authorId),
       db.select({ dev: schema.codePatterns.authorId, n: count() }).from(schema.codePatterns).where(and(eq(schema.codePatterns.projectId, projectId), isNotNull(schema.codePatterns.authorId))).groupBy(schema.codePatterns.authorId),
       db
         .select({ bucket: sql<string>`to_char(date_trunc('hour', ${schema.hookEvents.ts}), 'YYYY-MM-DD"T"HH24:00')`, dev: schema.hookEvents.developerId, n: count() })
-        .from(schema.hookEvents).where(and(eq(schema.hookEvents.projectId, projectId), isNotNull(schema.hookEvents.developerId))).groupBy(sql`1`, schema.hookEvents.developerId).orderBy(sql`1`),
+        .from(schema.hookEvents).where(and(eq(schema.hookEvents.projectId, projectId), isNotNull(schema.hookEvents.developerId), since(schema.hookEvents.ts))).groupBy(sql`1`, schema.hookEvents.developerId).orderBy(sql`1`),
       computeOwnership(projectId, 60 * 24 * 14), // 2-week window: "owned" for the whole event
       // raw file paths PER developer for language/layer analysis: git LOC
       // (authoritative) + hook edits (fallback before git is configured)
@@ -104,7 +112,7 @@ export async function buildReport(projectId: string, generatedAt: string): Promi
       // raw sessions for per-model + cost (cost depends on each session's model)
       db
         .select({ dev: schema.sessions.developerId, inputTokens: schema.sessions.inputTokens, outputTokens: schema.sessions.outputTokens, cacheReadTokens: schema.sessions.cacheReadTokens, model: schema.sessions.model })
-        .from(schema.sessions).where(and(eq(schema.sessions.projectId, projectId), isNotNull(schema.sessions.developerId))),
+        .from(schema.sessions).where(and(eq(schema.sessions.projectId, projectId), isNotNull(schema.sessions.developerId), since(schema.sessions.lastSeenAt))),
     ]);
   const [gitFilesAgg, hookFilesAgg, sessRaw] = [extra1, extra2, extra3];
 

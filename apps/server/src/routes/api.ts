@@ -274,15 +274,15 @@ apiRoutes.get('/usage/trend', async (c) => {
 });
 
 // burndown — daily cumulative scope vs done (and remaining) over the project, so
-// the team sees momentum toward the goal. Approximate completion time = updatedAt
-// of done tasks; scope grows as tasks are added.
+// the team sees momentum toward the goal. Completion time = the task's completedAt
+// (accurate), falling back to updatedAt for rows finished before that was tracked.
 apiRoutes.get('/burndown', async (c) => {
   const pid = c.get('project').id;
-  const rows = await db.select({ createdAt: schema.tasks.createdAt, updatedAt: schema.tasks.updatedAt, status: schema.tasks.status }).from(schema.tasks).where(eq(schema.tasks.projectId, pid));
+  const rows = await db.select({ createdAt: schema.tasks.createdAt, updatedAt: schema.tasks.updatedAt, completedAt: schema.tasks.completedAt, status: schema.tasks.status }).from(schema.tasks).where(eq(schema.tasks.projectId, pid));
   if (!rows.length) return c.json({ series: [], total: 0, done: 0 });
   const day = (d: Date | string) => new Date(d).toISOString().slice(0, 10);
   const created = rows.map((r) => day(r.createdAt));
-  const doneDays = rows.filter((r) => r.status === 'done').map((r) => day(r.updatedAt));
+  const doneDays = rows.filter((r) => r.status === 'done').map((r) => day(r.completedAt ?? r.updatedAt));
   const start = created.reduce((a, b) => (a < b ? a : b));
   const end = day(new Date());
   const days: string[] = [];
@@ -390,7 +390,11 @@ apiRoutes.get('/presence', async (c) =>
 apiRoutes.get('/modules/ownership', async (c) => c.json(await computeOwnership(c.get('project').id)));
 
 // contribution report (who built what — for during + after the hackathon)
-apiRoutes.get('/report', async (c) => c.json(await buildReport(c.get('project').id, new Date().toISOString())));
+apiRoutes.get('/report', async (c) => {
+  const days = Number(c.req.query('days'));
+  const sinceDays = Number.isFinite(days) && days > 0 ? days : undefined;
+  return c.json(await buildReport(c.get('project').id, new Date().toISOString(), { sinceDays }));
+});
 
 apiRoutes.get('/users', async (c) =>
   c.json(

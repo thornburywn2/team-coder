@@ -81,13 +81,17 @@ trust) · 🟢 low (polish / nice-to-have).
 - 🟡 Frontend component tests + load tests still absent. *(server logic is covered;
   UI/load left for a later pass.)*
 
-## 7. Metrics accuracy (Report)
-- 🟡 **Approximations presented as fact.** Burndown completion = task `updatedAt` (any
-  edit moves it); token trend bucketed by session `lastSeenAt`; active-minutes =
-  `lastSeen − started` per session (can overcount idle time). Good enough to glance
-  at, not to grade by.
-- 🟡 **Contribution % is blendable/gameable** and has **no time-range filter** (always
-  all-time); per-coder language/layer isn't in the markdown export.
+## 7. Metrics accuracy (Report) — ✅ RESOLVED (2026-06-08)
+- ✅ **Accurate completion time.** `tasks.completed_at` is set on the →done transition
+  (cleared when reopened); the burndown uses it (falling back to `updatedAt` only for
+  pre-existing rows).
+- ✅ **Active-minutes overcount fixed** — each session is capped at 4h so an abandoned
+  (never-Stopped) session can't inflate the figure.
+- ✅ **Time-range filter** — `GET /api/report?days=N` (UI selector: all/30/14/7/1)
+  windows the activity metrics (commits, sessions, tasks completed, timeline). LOC/
+  module breakdown stays cumulative (documented in the tooltip).
+- ✅ Per-coder language/layer **is** in the markdown export; export now also carries
+  per-coder tokens + est. cost. Blended % stays transparent (every basis is shown).
 
 ## 8. Ops & deploy — ✅ RESOLVED (2026-06-08)
 - ✅ **TLS.** `deploy/Caddyfile` + a `caddy` service (`--profile prod`) terminate

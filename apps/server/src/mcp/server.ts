@@ -365,7 +365,7 @@ export function createMcpServer(dev: Developer): McpServer {
         const [held] = await db.select({ displayName: schema.users.displayName, username: schema.users.username }).from(schema.users).where(eq(schema.users.id, before.assigneeId));
         warning = `was already claimed by ${held?.displayName ?? held?.username ?? 'a teammate'} — coordinate to avoid duplicate work`;
       }
-      const [row] = await db.update(schema.tasks).set({ assigneeId: dev.id, status: 'in_progress', updatedAt: new Date() }).where(inProject(eq(schema.tasks.id, task_id))).returning(TASK_FIELDS);
+      const [row] = await db.update(schema.tasks).set({ assigneeId: dev.id, status: 'in_progress', completedAt: null, updatedAt: new Date() }).where(inProject(eq(schema.tasks.id, task_id))).returning(TASK_FIELDS);
       if (!row) return text({ error: 'task not found' });
       pushFeed(pid, { ...feedBase, kind: 'claim', detail: `claimed "${row.title}"${warning ? ' (contended)' : ''}` });
       return text({ ok: true, task: row, ...(warning ? { warning } : {}) });
@@ -402,7 +402,7 @@ export function createMcpServer(dev: Developer): McpServer {
     'update_task_progress',
     { description: 'Update a task status and optionally add a progress note (the note is saved to the task thread so anyone can read it back).', inputSchema: { task_id: z.string(), status: z.enum(TASK_STATUS), note: z.string().optional() } },
     async ({ task_id, status, note }) => {
-      const [row] = await db.update(schema.tasks).set({ status, updatedAt: new Date() }).where(inProject(eq(schema.tasks.id, task_id))).returning(TASK_FIELDS);
+      const [row] = await db.update(schema.tasks).set({ status, completedAt: status === 'done' ? new Date() : null, updatedAt: new Date() }).where(inProject(eq(schema.tasks.id, task_id))).returning(TASK_FIELDS);
       if (!row) return text({ error: 'task not found' });
       // persist the note as a durable, readable comment (not just an ephemeral feed item)
       if (note?.trim()) await db.insert(schema.comments).values({ projectId: pid, authorId: dev.id, targetType: 'task', targetId: task_id, content: note.trim() });
@@ -415,7 +415,7 @@ export function createMcpServer(dev: Developer): McpServer {
     'complete_task',
     { description: 'Mark a task done with a short summary of what you did.', inputSchema: { task_id: z.string(), summary: z.string().optional() } },
     async ({ task_id, summary }) => {
-      const [row] = await db.update(schema.tasks).set({ status: 'done', updatedAt: new Date() }).where(inProject(eq(schema.tasks.id, task_id))).returning(TASK_FIELDS);
+      const [row] = await db.update(schema.tasks).set({ status: 'done', completedAt: new Date(), updatedAt: new Date() }).where(inProject(eq(schema.tasks.id, task_id))).returning(TASK_FIELDS);
       if (!row) return text({ error: 'task not found' });
       if (summary?.trim()) await noteOnTask(task_id, `✅ Completed: ${summary.trim()}`);
       pushFeed(pid, { ...feedBase, kind: 'done', detail: `completed "${row.title}"${summary ? ` — ${summary}` : ''}` });

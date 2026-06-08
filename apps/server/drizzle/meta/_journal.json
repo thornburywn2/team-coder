@@ -92,6 +92,13 @@
       "when": 1780892934693,
       "tag": "0012_useful_polaris",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1780893576664,
+      "tag": "0013_thick_patriot",
+      "breakpoints": true
     }
   ]
 }
