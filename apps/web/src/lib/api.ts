@@ -74,7 +74,7 @@ export interface Task {
   title: string;
   description: string | null;
   status: 'todo' | 'in_progress' | 'in_review' | 'done' | 'blocked';
-  source: 'manual' | 'prd';
+  source: 'manual' | 'prd' | 'proposal';
   assigneeId: string | null;
   moduleId: string | null;
   filePaths: string[];
@@ -171,6 +171,17 @@ export interface Proposal {
   commentCount: number;
 }
 
+export interface Decision {
+  id: string;
+  seq: number;
+  title: string;
+  context: string;
+  decision: string;
+  status: string;
+  authorId: string | null;
+  createdAt: string;
+}
+
 export interface Comment {
   id: string;
   authorId: string;
@@ -188,7 +199,7 @@ export function voteProposal(id: string, vote: VoteValue, voterId: string | null
   return api(`/proposals/${id}/vote`, { method: 'POST', body: JSON.stringify({ vote, voterId }) });
 }
 export function setProposalStatus(id: string, status: ProposalStatus, actorId: string | null) {
-  return api<Proposal>(`/proposals/${id}/status`, { method: 'POST', body: JSON.stringify({ status, actorId }) });
+  return api<Proposal & { adopted?: { tasks: number; adr: boolean } }>(`/proposals/${id}/status`, { method: 'POST', body: JSON.stringify({ status, actorId }) });
 }
 export function listComments(targetType: string, targetId: string) {
   return api<Comment[]>(`/comments?targetType=${targetType}&targetId=${targetId}`);

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { api, createProposal, setProposalStatus, voteProposal, type Proposal, type ProposalStatus, type User, type VoteValue } from '../lib/api';
+import { api, createProposal, setProposalStatus, voteProposal, type Decision, type Proposal, type ProposalStatus, type User, type VoteValue } from '../lib/api';
 import { queryClient } from '../lib/query';
 import { useStore } from '../store';
 import { Thread } from './Thread';
@@ -45,10 +45,18 @@ function NewProposal({ meId }: { meId: string | null }) {
 
 function Card({ p, users, meId }: { p: Proposal; users: User[]; meId: string | null }) {
   const [showThread, setShowThread] = useState(false);
+  const [adopted, setAdopted] = useState<number | null>(null);
   const author = users.find((u) => u.id === p.authorId);
   const myVote = p.votes.find((v) => v.voterId === meId)?.vote;
   const vote = useMutation({ mutationFn: (v: VoteValue) => voteProposal(p.id, v, meId), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['proposals'] }) });
-  const status = useMutation({ mutationFn: (s: ProposalStatus) => setProposalStatus(p.id, s, meId), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['proposals'] }) });
+  const status = useMutation({
+    mutationFn: (s: ProposalStatus) => setProposalStatus(p.id, s, meId),
+    onSuccess: (res) => {
+      if (res.adopted) { setAdopted(res.adopted.tasks); queryClient.invalidateQueries({ queryKey: ['decisions'] }); }
+      queryClient.invalidateQueries({ queryKey: ['proposals'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
 
   return (
     <section className="panel proposal">
@@ -66,6 +74,7 @@ function Card({ p, users, meId }: { p: Proposal; users: User[]; meId: string | n
           </button>
         ))}
       </div>
+      {adopted !== null && <p className="adopted-note">✓ Adopted — created {adopted} task{adopted === 1 ? '' : 's'} on the board.</p>}
       <div className="prop-actions">
         <button className="link-btn" onClick={() => setShowThread((s) => !s)}>💬 {p.commentCount} {showThread ? '▾' : '▸'}</button>
         {p.status === 'open' && (
@@ -75,6 +84,21 @@ function Card({ p, users, meId }: { p: Proposal; users: User[]; meId: string | n
         )}
       </div>
       {showThread && <Thread targetType="proposal" targetId={p.id} />}
+    </section>
+  );
+}
+
+function Decisions() {
+  const { data: decisions = [] } = useQuery({ queryKey: ['decisions'], queryFn: () => api<Decision[]>('/decisions') });
+  if (decisions.length === 0) return null;
+  return (
+    <section className="panel decisions">
+      <h2>Decisions of record <span className="small muted">ADRs — don't relitigate</span></h2>
+      <ul>
+        {decisions.map((d) => (
+          <li key={d.id}><span className="adr-seq">ADR-{d.seq}</span> <strong>{d.title}</strong></li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -92,6 +116,7 @@ export function Proposals() {
       </div>
       {proposals.length === 0 && <p className="muted">No proposals yet — raise the first idea.</p>}
       {proposals.map((p) => <Card key={p.id} p={p} users={users} meId={meId} />)}
+      <Decisions />
     </div>
   );
 }

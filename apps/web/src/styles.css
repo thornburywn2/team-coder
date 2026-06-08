@@ -236,6 +236,10 @@ main { display: grid; grid-template-columns: 1fr 360px; gap: 1rem; align-items: 
 .vote-btn .tally { color: var(--muted); font-weight: 700; margin-left: 0.2rem; }
 .prop-actions { display: flex; align-items: center; gap: 0.75rem; }
 .prop-actions .status-actions { margin-left: auto; display: flex; gap: 0.5rem; }
+.adopted-note { color: var(--green); font-size: 0.8rem; margin: 0.4rem 0; }
+.decisions ul { list-style: none; margin: 0; padding: 0; }
+.decisions li { padding: 0.35rem 0; border-top: 1px solid var(--border); font-size: 0.85rem; }
+.adr-seq { font-size: 0.65rem; color: var(--accent); background: rgba(91,140,255,0.12); padding: 0.1rem 0.4rem; border-radius: 4px; }
 .badge.prop-open { color: var(--amber); }
 .badge.prop-accepted { color: var(--green); }
 .badge.prop-rejected, .badge.prop-withdrawn { color: var(--gray); }

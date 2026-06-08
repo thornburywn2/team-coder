@@ -18,7 +18,7 @@ import { sql } from 'drizzle-orm';
 export const taskStatus = pgEnum('task_status', [
   'todo', 'in_progress', 'in_review', 'done', 'blocked',
 ]);
-export const taskSource = pgEnum('task_source', ['manual', 'prd']);
+export const taskSource = pgEnum('task_source', ['manual', 'prd', 'proposal']);
 export const proposalStatus = pgEnum('proposal_status', [
   'draft', 'open', 'accepted', 'rejected', 'withdrawn',
 ]);

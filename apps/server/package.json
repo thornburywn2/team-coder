@@ -20,7 +20,8 @@
     "verify:isolation": "bun run src/verify-isolation.ts",
     "verify:notes": "bun run src/verify-notes.ts",
     "verify:decompose": "bun run src/verify-decompose.ts",
-    "verify:proposals": "bun run src/verify-proposals.ts"
+    "verify:proposals": "bun run src/verify-proposals.ts",
+    "verify:inheritance": "bun run src/verify-inheritance.ts"
   },
   "dependencies": {
     "@team-coder/shared": "workspace:*",

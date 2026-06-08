@@ -58,6 +58,7 @@ export function Tasks() {
               <div className="task-row">
                 <span className={`badge ${t.status}`}>{t.status.replace('_', ' ')}</span>
                 {t.source === 'prd' && <span className="goal-tag" title="from the project goal (PRD)">🎯</span>}
+                {t.source === 'proposal' && <span className="goal-tag" title="from an adopted proposal">💡</span>}
                 <span className="task-title">{t.title}</span>
                 {owner && (
                   <span className="owner">

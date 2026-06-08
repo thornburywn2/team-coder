@@ -121,3 +121,16 @@ apiRoutes.route('/tasks', taskRoutes);
 // proposals (design-evolution channel + voting) and comments (anchored threads)
 apiRoutes.route('/proposals', proposalRoutes);
 apiRoutes.route('/comments', commentRoutes);
+
+// decisions of record (ADRs) — captured when proposals are adopted, so the team
+// doesn't relitigate. Newest first.
+apiRoutes.get('/decisions', async (c) =>
+  c.json(
+    await db
+      .select({ id: schema.adrs.id, seq: schema.adrs.sequenceNum, title: schema.adrs.title, context: schema.adrs.context, decision: schema.adrs.decision, status: schema.adrs.status, authorId: schema.adrs.authorId, createdAt: schema.adrs.createdAt })
+      .from(schema.adrs)
+      .where(eq(schema.adrs.projectId, c.get('project').id))
+      .orderBy(desc(schema.adrs.createdAt))
+      .limit(100),
+  ),
+);
