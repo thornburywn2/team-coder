@@ -380,6 +380,11 @@ export function getLocks() {
   return api<Lock[]>('/locks');
 }
 
+export interface BranchInfo { name: string; ahead: number; behind: number; lastCommit: string; lastCommitAt: string | null }
+export function getBranches() {
+  return api<BranchInfo[]>('/repo/branches');
+}
+
 export interface CollisionWarning {
   file: string;
   developers: { id: string; name: string }[];

@@ -143,6 +143,36 @@ export async function pollGitRepo(opts: {
   return { projectId, configured: true, newCommits };
 }
 
+export interface BranchInfo { name: string; ahead: number; behind: number; lastCommit: string; lastCommitAt: string | null }
+
+/**
+ * Branch awareness for "prove on a branch → inherit": read the project's mirror and
+ * report each non-default remote branch with how far it is ahead/behind the default
+ * branch. Lets a proposal's experiment branch show its proof status. Empty if the
+ * repo isn't cloned yet.
+ */
+export async function gitBranches(projectId: string): Promise<BranchInfo[]> {
+  const baseDir = process.env.PRODUCT_REPOS_DIR ?? '.product-repos';
+  const repoDir = resolve(baseDir, projectId);
+  if (!isGitRepo(repoDir)) return [];
+  const head = git(repoDir, ['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD']);
+  const def = (head.ok ? head.out.trim().replace(/^origin\//, '') : '') || 'main';
+  const refs = git(repoDir, ['for-each-ref', '--format=%(refname:short)|%(committerdate:iso8601)|%(subject)', 'refs/remotes/origin']);
+  if (!refs.ok) return [];
+  const out: BranchInfo[] = [];
+  for (const line of refs.out.split('\n').map((s) => s.trim()).filter(Boolean)) {
+    const [short = '', date = '', ...rest] = line.split('|');
+    const subject = rest.join('|');
+    const name = short.replace(/^origin\//, '');
+    if (!name || !short.includes('/') || short === 'origin/HEAD' || name === def) continue; // skip the HEAD symref + default
+    let behind = 0, ahead = 0;
+    const counts = git(repoDir, ['rev-list', '--left-right', '--count', `origin/${def}...origin/${name}`]);
+    if (counts.ok) { const [b, a] = counts.out.trim().split(/\s+/).map((n) => parseInt(n, 10) || 0); behind = b ?? 0; ahead = a ?? 0; }
+    out.push({ name, ahead, behind, lastCommit: subject, lastCommitAt: date || null });
+  }
+  return out.sort((a, b) => (b.lastCommitAt ?? '').localeCompare(a.lastCommitAt ?? ''));
+}
+
 /**
  * Poll every project that has a configured repo. Opt-in via ENABLE_GIT_POLL so
  * local dev (where the Default Project points at the team-coder repo) doesn't

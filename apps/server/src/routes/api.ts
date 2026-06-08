@@ -11,6 +11,7 @@ import { buildReport } from '../report';
 import { estimateCost } from '../lib/pricing';
 import { decomposePrd } from '../lib/decompose';
 import { decomposePrdLlm, llmEnabled } from '../lib/decompose-llm';
+import { gitBranches } from '../git-poll';
 import { computeAwards } from '../lib/awards';
 import { taskRoutes } from './tasks';
 import { proposalRoutes } from './proposals';
@@ -303,6 +304,10 @@ apiRoutes.get('/collisions', (c) => c.json(recentCollisions(c.get('project').id)
 
 // active cooperative work-locks (who's holding which file right now)
 apiRoutes.get('/locks', async (c) => c.json(await activeLocks(c.get('project').id)));
+
+// experiment branches in the repo mirror, with ahead/behind vs the default branch
+// (powers a proposal's "proven on a branch" status — prove-then-inherit).
+apiRoutes.get('/repo/branches', async (c) => c.json(await gitBranches(c.get('project').id)));
 
 // team AWARDS — a positive "leaderboard": everyone gets an award reflecting a real
 // strength (nothing negative). Built from the full contribution report + live

@@ -42,7 +42,8 @@ async function main(): Promise<boolean> {
 
   await writer`DELETE FROM tasks WHERE id = ${row!.id}`;
 
-  return !!matched && matched.table === 'tasks' && matched.op === 'INSERT' && matched.id === row!.id;
+  const m = matched as { op: string; table: string; id: string } | null;
+  return !!m && m.table === 'tasks' && m.op === 'INSERT' && m.id === row!.id;
 }
 
 let ok = false;

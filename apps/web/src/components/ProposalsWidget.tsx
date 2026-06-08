@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { api, setProposalStatus, voteProposal, type Proposal, type ProposalStatus, type User, type VoteValue } from '../lib/api';
+import { api, getBranches, setProposalStatus, voteProposal, type BranchInfo, type Proposal, type ProposalStatus, type User, type VoteValue } from '../lib/api';
 import { queryClient } from '../lib/query';
 import { useStore } from '../store';
 import { Thread } from './Thread';
@@ -15,9 +15,10 @@ const VOTES: { v: VoteValue; icon: string; title: string }[] = [
   { v: 'abstain', icon: '🤷', title: 'Abstain' },
 ];
 
-function Row({ p, users, meId }: { p: Proposal; users: User[]; meId: string | null }) {
+function Row({ p, users, meId, branches }: { p: Proposal; users: User[]; meId: string | null; branches: BranchInfo[] }) {
   const [open, setOpen] = useState(false);
   const author = users.find((u) => u.id === p.authorId);
+  const branch = p.experimentBranch ? branches.find((b) => b.name === p.experimentBranch) : undefined;
   const myVote = p.votes.find((x) => x.voterId === meId)?.vote;
   const vote = useMutation({ mutationFn: (v: VoteValue) => voteProposal(p.id, v, meId), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['proposals'] }) });
   const status = useMutation({
@@ -38,6 +39,12 @@ function Row({ p, users, meId }: { p: Proposal; users: User[]; meId: string | nu
         <span className="pw-title">{p.title}</span>
         {author && <span className="pw-author small muted">{author.displayName ?? author.username}</span>}
       </div>
+      {p.experimentBranch && (
+        <div className="pw-branch small muted" title="Experiment branch — prove it here, then inherit on accept">
+          ⎇ {p.experimentBranch}
+          {branch ? <span className="pw-branch-stat"> · +{branch.ahead}/-{branch.behind} vs main{branch.ahead > 0 ? ' ✓ proven' : ''}</span> : <span className="pw-branch-stat"> · not in repo yet</span>}
+        </div>
+      )}
       <div className="pw-actions">
         {VOTES.map(({ v, icon, title }) => (
           <button key={v} className={`vote-btn ${myVote === v ? 'mine' : ''}`} title={`${title} — ${p.tally[v]} so far`} disabled={vote.isPending} onClick={() => vote.mutate(v)}>
@@ -62,6 +69,8 @@ export function ProposalsWidget() {
   const { data: proposals = [] } = useQuery({ queryKey: ['proposals'], queryFn: () => api<Proposal[]>('/proposals') });
   const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => api<User[]>('/users') });
   const open = proposals.filter((p) => p.status === 'open');
+  // branch proof status — only fetched when a proposal actually names an experiment branch
+  const { data: branches = [] } = useQuery({ queryKey: ['branches'], queryFn: getBranches, enabled: open.some((p) => !!p.experimentBranch), refetchInterval: 30000 });
 
   return (
     <section className="panel widget proposals-widget" title="Vote and discuss open proposals inline — no page change">
@@ -71,7 +80,7 @@ export function ProposalsWidget() {
         <p className="muted small">No open proposals — raise one above.</p>
       ) : (
         <ul className="pw-list">
-          {open.map((p) => <Row key={p.id} p={p} users={users} meId={meId} />)}
+          {open.map((p) => <Row key={p.id} p={p} users={users} meId={meId} branches={branches} />)}
         </ul>
       )}
     </section>

@@ -8,6 +8,12 @@ would need.
 Severity: 🔴 high (correctness/security/blocks real use) · 🟡 medium (limits scale or
 trust) · 🟢 low (polish / nice-to-have).
 
+> **STATUS (2026-06-08): all high / medium / low items resolved.** Every section
+> below is ✅; a handful of explicitly-scoped 🟢 nice-to-haves (subtasks/dependencies,
+> drag-between-statuses, multi-node Redis fan-out, opt-in local sync, full
+> observability stack) are noted inline as deliberately deferred. 17 unit + 22
+> integration tests green; CI runs them on every push.
+
 ---
 
 ## 1. Security & auth — ✅ RESOLVED (2026-06-08)
@@ -67,10 +73,12 @@ trust) · 🟢 low (polish / nice-to-have).
 - ✅ **Force-push/rebase tolerated.** A non-ff pull now hard-resets our read-only
   mirror to upstream (never an engineer's repo). **Log cap raised** to 5000
   (configurable via `GIT_LOG_LIMIT`).
-- 🟡 **`main`-only.** Still no branch awareness; the "prove on a branch → inherit"
-  proposal story isn't wired to branch diffs. *(left for a later pass)*
+- ✅ **Branch awareness** — `GET /api/repo/branches` reports each experiment branch's
+  ahead/behind vs the default branch (from the mirror); a proposal's experiment branch
+  shows its "✓ proven" status in the widget (prove-then-inherit is now wired to real
+  git diffs).
 - 🟢 **Local sync (`team-coder-sync.sh`) is opt-in** per engineer; nothing ensures
-  everyone runs it. *(coordination, not attribution — left for a later pass)*
+  everyone runs it. *(it's an engineer convenience; the server mirror is authoritative.)*
 
 ## 6. Testing & CI — ✅ RESOLVED (2026-06-08)
 - ✅ **CI** (`.github/workflows/ci.yml`): spins up Postgres, installs, typechecks all
