@@ -9,41 +9,38 @@ const listener = postgres(DATABASE_URL, { max: 1 });
 const writer = postgres(DATABASE_URL, { max: 1 });
 
 async function main(): Promise<boolean> {
-  let matched: { op: string; table: string; id: string } | null = null;
+  type Note = { op: string; table: string; id: string };
+  const seen: Note[] = [];
   let targetId = '';
+  let resolveGot: () => void = () => {};
 
-  // resolve only when we see OUR task's notification — other NOTIFYs (a busy shared
-  // DB: git-poll, idle, etc.) are ignored instead of clobbering the captured one.
+  const matches = () => !!targetId && seen.some((p) => p.table === 'tasks' && p.op === 'INSERT' && p.id === targetId);
+
+  // buffer every notification; resolve once OUR task's insert shows up. Buffering
+  // avoids a race where the NOTIFY arrives before we learn the inserted id, and
+  // ignores unrelated NOTIFYs from a busy shared DB (git-poll, idle, etc.).
+  let timeout: ReturnType<typeof setTimeout>;
   const got = new Promise<void>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('timeout: no matching NOTIFY in 5s')), 5000);
+    resolveGot = () => { clearTimeout(timeout); resolve(); };
+    timeout = setTimeout(() => reject(new Error('timeout: no matching NOTIFY in 5s')), 5000);
     listener.listen('db_notifications', (payload) => {
-      try {
-        const p = JSON.parse(payload) as { op: string; table: string; id: string };
-        if (p.table === 'tasks' && p.op === 'INSERT' && p.id === targetId) {
-          matched = p;
-          clearTimeout(timeout);
-          resolve();
-        }
-      } catch { /* ignore non-JSON */ }
+      try { seen.push(JSON.parse(payload) as Note); } catch { /* ignore non-JSON */ }
+      if (matches()) resolveGot();
     });
   });
 
-  // let LISTEN register before we write
-  await new Promise((r) => setTimeout(r, 300));
+  await new Promise((r) => setTimeout(r, 300)); // let LISTEN register before we write
 
   const [row] = await writer<{ id: string }[]>`
     INSERT INTO tasks (title) VALUES ('notify round-trip probe') RETURNING id
   `;
   targetId = row!.id;
   console.log('[verify] inserted task', row!.id);
+  if (matches()) resolveGot(); // it may have arrived before we set targetId
 
   await got;
-  console.log('[verify] received payload:', JSON.stringify(matched));
-
   await writer`DELETE FROM tasks WHERE id = ${row!.id}`;
-
-  const m = matched as { op: string; table: string; id: string } | null;
-  return !!m && m.table === 'tasks' && m.op === 'INSERT' && m.id === row!.id;
+  return matches();
 }
 
 let ok = false;
