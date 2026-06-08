@@ -4,6 +4,30 @@
 
 ---
 
+## 2026-06-08 (d) — Per-coder breakdown + weeks-long durable capture
+
+**Scope:** apps/server (report, feed, schema), apps/web
+**Outcome:** SUCCESS
+
+- **Per-coder language + layer breakdown** (was team-level only): report queries
+  group file weights by developer; each coder gets `languages[]` + `layers[]`
+  (chips in the UI + JSON/Markdown export).
+- **Weeks-long capture** (project runs 4–7 days): the activity feed is now durable
+  (`feed_items`, migration 0008) so history survives restarts/redeploys and the
+  whole timeframe is reportable; `GET /api/feed` reads it (live WS unchanged). The
+  report timeline auto-collapses hourly→daily past 2 days (`timelineUnit`) so a
+  week-long report is readable. Audited: all report aggregates are all-time, no
+  pruning, no windows that drop project data — the only ephemeral state left
+  (connections/collisions, both "right now" views) correctly resets.
+
+`verify:extras` extended with per-coder assertions; all 18 verify green.
+
+**Lesson:** For a multi-day, redeploy-prone deployment, anything you must "report
+on later" has to be in Postgres, not an in-memory ring — the report was already
+DB-backed, but the live feed wasn't, so it was the one capture gap.
+
+---
+
 ## 2026-06-08 (c) — Pre-deploy: report analysis, agents, UX fixes, onboarding docs
 
 **Scope:** apps/server (report, agents, projects, hooks), apps/web, agent-kit, docs
