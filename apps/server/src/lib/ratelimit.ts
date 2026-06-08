@@ -4,8 +4,6 @@ import { createMiddleware } from 'hono/factory';
 // when present, else client IP. Single-node (matches the rest of the live state);
 // a multi-node deploy would back this with Redis. Disable with RATE_LIMIT=0.
 
-const enabled = process.env.RATE_LIMIT !== '0';
-
 interface Bucket { hits: number[]; }
 const buckets = new Map<string, Bucket>();
 
@@ -22,7 +20,7 @@ function clientKey(c: { req: { header: (n: string) => string | undefined } }): s
  */
 export function rateLimit(opts: { max: number; windowMs: number; name: string }) {
   return createMiddleware(async (c, next) => {
-    if (!enabled) return next();
+    if (process.env.RATE_LIMIT === '0') return next(); // disabled (e.g. CI/dev)
     const key = `${opts.name}:${clientKey(c)}`;
     const now = Date.now();
     const b = buckets.get(key) ?? { hits: [] };

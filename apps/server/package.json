@@ -7,6 +7,8 @@
     "dev": "bun run --hot src/index.ts",
     "start": "bun run src/index.ts",
     "typecheck": "tsc --noEmit",
+    "test": "bun test src/lib",
+    "test:coverage": "bun test --coverage src/lib",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/db/migrate.ts",
     "db:seed": "bun run src/db/seed.ts",

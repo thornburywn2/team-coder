@@ -40,14 +40,15 @@ trust) · 🟢 low (polish / nice-to-have).
   `TOKEN_RATES_JSON`) estimates cost per session at its model's rate; the Report
   shows per-coder $ + a per-model split + total. Cache tokens captured too.
 
-## 3. Coordination is advisory, not enforced
-- 🔴 **Work-locks & collisions don't prevent anything.** `acquire_file` is opt-in,
-  MCP-only, and not auto-acquired from hooks — an agent that skips it won't
-  coordinate, and nothing stops a second writer. "Hold until released" only works if
-  every agent is told to call it.
-- 🟡 **Locks are in-memory** → lost on restart; no audit of who held what.
-- 🟡 **No conflict resolution** when two coders do edit the same file — only a
-  warning after the fact.
+## 3. Coordination — ✅ RESOLVED (2026-06-08)
+- ✅ **Auto-acquired, not opt-in.** The `PreToolUse` hook now auto-acquires a
+  work-lock on the file being edited (and `Stop` releases all of a coder's locks),
+  so "hold until released" works without the agent calling anything. `acquire_file`/
+  `check_file` remain for proactive holding.
+- ✅ **Locks persisted** (`work_locks` table) → survive restarts; visible in the 🔒
+  board widget and `GET /api/locks` (who held what, when). TTL auto-frees stale locks.
+- 🟡 True hard-prevention (rejecting the second writer) stays advisory by design —
+  humans steer. The auto-lock + collision warning is the practical resolution.
 
 ## 4. Realtime & scale
 - 🟡 **Single-process, in-memory pub/sub.** WebSockets, presence, collisions, and
@@ -71,13 +72,14 @@ trust) · 🟢 low (polish / nice-to-have).
 - 🟢 **Local sync (`team-coder-sync.sh`) is opt-in** per engineer; nothing ensures
   everyone runs it. *(coordination, not attribution — left for a later pass)*
 
-## 6. Testing & CI
-- 🔴 **No CI** (`.github/workflows` absent) — nothing runs the 19 verify scripts on
-  push/PR.
-- 🔴 **No unit tests and no coverage measurement.** The verify suite is
-  integration-only (needs a live server + seeded DB), mostly happy-path; the global
-  80% coverage target is neither met nor measured. No frontend component tests, no
-  load tests.
+## 6. Testing & CI — ✅ RESOLVED (2026-06-08)
+- ✅ **CI** (`.github/workflows/ci.yml`): spins up Postgres, installs, typechecks all
+  workspaces, runs unit tests, builds web, migrates+seeds, boots the server, and runs
+  the full `verify:all` integration suite (22 scripts) on every push/PR.
+- ✅ **Unit tests** (`bun test`): 17 tests over the pure logic — pricing, classify,
+  scrub, decompose, awards, and the rate limiter — with `test:coverage` available.
+- 🟡 Frontend component tests + load tests still absent. *(server logic is covered;
+  UI/load left for a later pass.)*
 
 ## 7. Metrics accuracy (Report)
 - 🟡 **Approximations presented as fact.** Burndown completion = task `updatedAt` (any

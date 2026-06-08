@@ -302,7 +302,7 @@ apiRoutes.get('/feed', async (c) => c.json(await recentFeed(c.get('project').id)
 apiRoutes.get('/collisions', (c) => c.json(recentCollisions(c.get('project').id)));
 
 // active cooperative work-locks (who's holding which file right now)
-apiRoutes.get('/locks', (c) => c.json(activeLocks(c.get('project').id)));
+apiRoutes.get('/locks', async (c) => c.json(await activeLocks(c.get('project').id)));
 
 // team AWARDS — a positive "leaderboard": everyone gets an award reflecting a real
 // strength (nothing negative). Built from the full contribution report + live

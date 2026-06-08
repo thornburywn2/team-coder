@@ -509,7 +509,7 @@ export function createMcpServer(dev: Developer): McpServer {
       inputSchema: { file_path: z.string() },
     },
     async ({ file_path }) => {
-      const r = acquireLock(pid, file_path, dev.id, me);
+      const r = await acquireLock(pid, file_path, dev.id, me);
       if (r.acquired) return text({ acquired: true, file: file_path });
       return text({ acquired: false, held_by: r.lock.holderName, since: new Date(r.lock.ts).toISOString(), advice: 'hold and retry until released' });
     },
@@ -518,14 +518,14 @@ export function createMcpServer(dev: Developer): McpServer {
   server.registerTool(
     'release_file',
     { description: 'Release your soft work-lock on a file when you finish editing it, so a waiting teammate can proceed.', inputSchema: { file_path: z.string() } },
-    async ({ file_path }) => text({ released: releaseLock(pid, file_path, dev.id) }),
+    async ({ file_path }) => text({ released: await releaseLock(pid, file_path, dev.id) }),
   );
 
   server.registerTool(
     'check_file',
     { description: 'Check whether a file is currently held by a teammate before you start. Returns who holds it, if anyone.', inputSchema: { file_path: z.string() } },
     async ({ file_path }) => {
-      const l = checkLock(pid, file_path);
+      const l = await checkLock(pid, file_path);
       return text(l && l.holderId !== dev.id ? { available: false, held_by: l.holderName, since: new Date(l.ts).toISOString() } : { available: true });
     },
   );

@@ -8,6 +8,7 @@ import { scrubSecrets, scrubDeep } from '../lib/scrub';
 import { pushFeed, type FeedItem } from '../feed';
 import { touchHook } from '../connections';
 import { COLLISION_WINDOW_MS, recordCollision } from '../collisions';
+import { acquire as acquireLock, releaseAll as releaseLocks } from '../locks';
 
 // Claude Code hook ingestion. Each coder's agent POSTs lifecycle events here with
 // their personal Bearer token (devAuth -> developer). We persist the raw event,
@@ -132,6 +133,13 @@ async function ingest(dev: Developer, ev: HookEventPayload): Promise<void> {
 
   // advisory concurrent-edit detection: another coder touched this same file recently?
   if (file && ev.hook_event_name === 'PreToolUse') await detectCollision(dev, file);
+
+  // automatic work-locks: acquire on edit (refreshes the hold), release all on Stop.
+  // Makes "hold until released" work without the agent opting in.
+  if (file && ev.hook_event_name === 'PreToolUse') {
+    await acquireLock(dev.projectId, file, dev.id, dev.displayName ?? dev.username).catch(() => {});
+  }
+  if (ev.hook_event_name === 'Stop') await releaseLocks(dev.projectId, dev.id).catch(() => {});
 }
 
 async function detectCollision(dev: Developer, file: string): Promise<void> {

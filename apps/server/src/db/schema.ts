@@ -268,6 +268,18 @@ export const gitFileChanges = pgTable('git_file_changes', {
   modIdx: index('idx_gfc_module').on(t.moduleId),
 }));
 
+// Cooperative work-locks (persisted so they survive a restart). One row per held
+// file per project; auto-acquired by the PreToolUse hook and via MCP acquire_file.
+export const workLocks = pgTable('work_locks', {
+  projectId: pid(),
+  file: text('file').notNull(),
+  holderId: uuid('holder_id').notNull(),
+  holderName: text('holder_name').notNull(),
+  acquiredAt: timestamp('acquired_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ({
+  uq: uniqueIndex('uq_work_locks_project_file').on(t.projectId, t.file),
+}));
+
 export const sessions = pgTable('sessions', {
   sessionId: text('session_id').primaryKey(),
   projectId: pid(),

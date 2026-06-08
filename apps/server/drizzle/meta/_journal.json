@@ -85,6 +85,13 @@
       "when": 1780892510674,
       "tag": "0011_stormy_katie_power",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1780892934693,
+      "tag": "0012_useful_polaris",
+      "breakpoints": true
     }
   ]
 }

@@ -1,56 +1,53 @@
-// Cooperative work locks. When a coder/agent is about to work in an area (a file),
-// it can ACQUIRE a soft lock; another agent that tries to acquire the same file
-// sees it's held and HOLDS until it's released (or the lock's TTL expires). This is
-// opt-in and advisory — humans steer, and a stale lock auto-frees so nobody is ever
-// permanently stuck. In-memory + per-project (liveness, not durable state).
+import { and, eq, gt, lt, sql } from 'drizzle-orm';
+import { db, schema } from './db';
 
-export interface Lock {
-  file: string;
-  holderId: string;
-  holderName: string;
-  ts: number; // last acquired/refreshed
-}
+// Cooperative work-locks, persisted in Postgres so they survive restarts. When a
+// coder/agent works in an area (a file) it ACQUIRES a soft lock; another that tries
+// the same file sees it's held and HOLDS until release (or the TTL expires). Locks
+// are auto-acquired by the PreToolUse hook and released on Stop, so coordination is
+// automatic — not opt-in. Advisory by design (humans steer); a stale lock auto-frees.
 
-export const LOCK_TTL_MS = 15 * 60_000; // a lock auto-expires if not refreshed
+export interface Lock { file: string; holderId: string; holderName: string; ts: number }
 
-const locks = new Map<string, Map<string, Lock>>(); // projectId -> file -> lock
+export const LOCK_TTL_MS = 15 * 60_000;
+const cutoff = () => new Date(Date.now() - LOCK_TTL_MS);
+const toLock = (r: { file: string; holderId: string; holderName: string; acquiredAt: Date | null }): Lock => ({ file: r.file, holderId: r.holderId, holderName: r.holderName, ts: (r.acquiredAt ?? new Date()).getTime() });
 
-function bucket(projectId: string): Map<string, Lock> {
-  let b = locks.get(projectId);
-  if (!b) { b = new Map(); locks.set(projectId, b); }
-  return b;
-}
-function live(l: Lock | undefined, now: number): Lock | undefined {
-  return l && now - l.ts < LOCK_TTL_MS ? l : undefined;
-}
-
-/** Try to take the lock. Re-acquiring your own lock just refreshes it. */
-export function acquire(projectId: string, file: string, holderId: string, holderName: string): { acquired: boolean; lock: Lock } {
-  const b = bucket(projectId);
-  const now = Date.now();
-  const cur = live(b.get(file), now);
-  if (cur && cur.holderId !== holderId) return { acquired: false, lock: cur }; // held by someone else
-  const lock: Lock = { file, holderId, holderName, ts: now };
-  b.set(file, lock);
-  return { acquired: true, lock };
+/** Take (or refresh) the lock. Re-acquiring your own lock just refreshes it. A
+ *  different holder fails unless the existing lock is stale (past TTL). */
+export async function acquire(projectId: string, file: string, holderId: string, holderName: string): Promise<{ acquired: boolean; lock: Lock }> {
+  const [held] = await db.select().from(schema.workLocks).where(and(eq(schema.workLocks.projectId, projectId), eq(schema.workLocks.file, file)));
+  if (held && held.holderId !== holderId && held.acquiredAt && held.acquiredAt > cutoff()) {
+    return { acquired: false, lock: toLock(held) };
+  }
+  const now = new Date();
+  await db
+    .insert(schema.workLocks)
+    .values({ projectId, file, holderId, holderName, acquiredAt: now })
+    .onConflictDoUpdate({ target: [schema.workLocks.projectId, schema.workLocks.file], set: { holderId, holderName, acquiredAt: now } });
+  return { acquired: true, lock: { file, holderId, holderName, ts: now.getTime() } };
 }
 
 /** Release your lock (no-op if you don't hold it). */
-export function release(projectId: string, file: string, holderId: string): boolean {
-  const cur = bucket(projectId).get(file);
-  if (cur && cur.holderId === holderId) { bucket(projectId).delete(file); return true; }
-  return false;
+export async function release(projectId: string, file: string, holderId: string): Promise<boolean> {
+  const r = await db.delete(schema.workLocks).where(and(eq(schema.workLocks.projectId, projectId), eq(schema.workLocks.file, file), eq(schema.workLocks.holderId, holderId))).returning({ file: schema.workLocks.file });
+  return r.length > 0;
 }
 
-/** Who holds this file right now (or null). */
-export function check(projectId: string, file: string): Lock | null {
-  return live(bucket(projectId).get(file), Date.now()) ?? null;
+/** Release every lock held by a coder (called on Stop). */
+export async function releaseAll(projectId: string, holderId: string): Promise<void> {
+  await db.delete(schema.workLocks).where(and(eq(schema.workLocks.projectId, projectId), eq(schema.workLocks.holderId, holderId)));
 }
 
-/** All active (non-expired) locks for a project, newest first. */
-export function activeLocks(projectId: string): Lock[] {
-  const now = Date.now();
-  const b = bucket(projectId);
-  for (const [f, l] of b) if (!live(l, now)) b.delete(f); // prune expired
-  return [...b.values()].sort((a, b2) => b2.ts - a.ts);
+/** Who holds this file right now (or null), ignoring stale locks. */
+export async function check(projectId: string, file: string): Promise<Lock | null> {
+  const [held] = await db.select().from(schema.workLocks).where(and(eq(schema.workLocks.projectId, projectId), eq(schema.workLocks.file, file), gt(schema.workLocks.acquiredAt, cutoff())));
+  return held ? toLock(held) : null;
+}
+
+/** All active (non-expired) locks for a project, newest first. Prunes stale ones. */
+export async function activeLocks(projectId: string): Promise<Lock[]> {
+  await db.delete(schema.workLocks).where(and(eq(schema.workLocks.projectId, projectId), lt(schema.workLocks.acquiredAt, cutoff())));
+  const rows = await db.select().from(schema.workLocks).where(eq(schema.workLocks.projectId, projectId)).orderBy(sql`${schema.workLocks.acquiredAt} desc`);
+  return rows.map(toLock);
 }

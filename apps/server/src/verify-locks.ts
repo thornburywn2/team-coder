@@ -49,6 +49,18 @@ try {
   const bAcq2 = textOf((await b.callTool({ name: 'acquire_file', arguments: { file_path: FILE } })) as never) as { acquired: boolean };
   check(bAcq2.acquired === true, 'Bob acquires once released');
 
+  // auto-acquire from a PreToolUse hook (no MCP call) — coordination without opt-in
+  const HOOK_FILE = 'apps/server/src/auto-lock-test.ts';
+  const hookHdr = { 'content-type': 'application/json', authorization: `Bearer ${tp.agentToken('carol')}`, 'x-developer-id': 'carol' };
+  await fetch(`${BASE}/hooks/event`, { method: 'POST', headers: hookHdr, body: JSON.stringify({ hook_event_name: 'PreToolUse', session_id: 'lock-hook', tool_name: 'Edit', tool_input: { file_path: HOOK_FILE } }) });
+  await new Promise((r) => setTimeout(r, 400)); // ingest is fire-and-forget
+  const list2 = (await (await fetch(`${BASE}/api/locks`, { headers: { 'x-team-token': tp.token } })).json()) as Array<{ file: string }>;
+  check(list2.some((l) => l.file === HOOK_FILE), 'PreToolUse hook auto-acquired a work-lock');
+  await fetch(`${BASE}/hooks/event`, { method: 'POST', headers: hookHdr, body: JSON.stringify({ hook_event_name: 'Stop', session_id: 'lock-hook' }) });
+  await new Promise((r) => setTimeout(r, 400));
+  const list3 = (await (await fetch(`${BASE}/api/locks`, { headers: { 'x-team-token': tp.token } })).json()) as Array<{ file: string }>;
+  check(!list3.some((l) => l.file === HOOK_FILE), 'Stop hook auto-released the work-lock');
+
   // token-usage trend endpoint responds
   await a.callTool({ name: 'report_usage', arguments: { input_tokens: 1000, output_tokens: 400 } });
   const trend = (await (await fetch(`${BASE}/api/usage/trend`, { headers: { 'x-team-token': tp.token } })).json()) as { series: unknown[]; total: number };
