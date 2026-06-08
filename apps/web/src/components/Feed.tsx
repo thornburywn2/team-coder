@@ -15,6 +15,9 @@ const KIND_ICON: Record<string, string> = {
   blocked: '🚧',
   decision: '📐',
   pattern: '🧩',
+  proposal: '💡',
+  vote: '🗳️',
+  comment: '💬',
 };
 
 function ago(ts: number): string {

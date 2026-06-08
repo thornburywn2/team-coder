@@ -52,8 +52,19 @@ async function toMessage(n: Notification): Promise<WsMessage | null> {
       const [row] = await db.select().from(schema.projectNotes).where(eq(schema.projectNotes.id, n.id));
       return row ? { type: 'NOTE_ADDED', payload: row, meta: { projectId: row.projectId ?? undefined } } : null;
     }
+    case 'comments': {
+      if (n.op === 'DELETE') return null;
+      const [row] = await db.select().from(schema.comments).where(eq(schema.comments.id, n.id));
+      return row ? { type: 'COMMENT_ADDED', payload: row, meta: { projectId: row.projectId ?? undefined } } : null;
+    }
+    case 'votes': {
+      if (n.op === 'DELETE') return null;
+      // votes change a proposal's tally — nudge clients to refetch that proposal
+      const [row] = await db.select().from(schema.votes).where(eq(schema.votes.id, n.id));
+      return row ? { type: 'VOTE_CAST', payload: { proposalId: row.proposalId }, meta: { projectId: row.projectId ?? undefined } } : null;
+    }
     default:
-      return null; // votes/comments/modules handled in later phases
+      return null; // modules handled in later phases
   }
 }
 

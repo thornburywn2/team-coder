@@ -15,7 +15,7 @@ export interface FeedItem {
   developerId?: string;
   developer?: string;
   color?: string;
-  kind: 'session_start' | 'prompt' | 'edit' | 'stop' | 'subagent' | 'claim' | 'done' | 'blocked' | 'decision' | 'pattern' | 'created';
+  kind: 'session_start' | 'prompt' | 'edit' | 'stop' | 'subagent' | 'claim' | 'done' | 'blocked' | 'decision' | 'pattern' | 'created' | 'proposal' | 'vote' | 'comment';
   detail?: string;
   file?: string;
 }

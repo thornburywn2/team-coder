@@ -8,6 +8,8 @@ import { computeOwnership } from '../ownership';
 import { buildReport } from '../report';
 import { decomposePrd } from '../lib/decompose';
 import { taskRoutes } from './tasks';
+import { proposalRoutes } from './proposals';
+import { commentRoutes } from './comments';
 
 // Human portal REST. Read endpoints for initial hydration; the WebSocket keeps
 // the client hot after load. All gated by a project's team token, which teamAuth
@@ -115,3 +117,7 @@ apiRoutes.post('/notes', async (c) => {
 
 // tasks: list / create / claim / done (taskRoutes reads the project from context)
 apiRoutes.route('/tasks', taskRoutes);
+
+// proposals (design-evolution channel + voting) and comments (anchored threads)
+apiRoutes.route('/proposals', proposalRoutes);
+apiRoutes.route('/comments', commentRoutes);

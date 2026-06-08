@@ -12,12 +12,13 @@ import { Feed } from './Feed';
 import { Notes } from './Notes';
 import { Tasks } from './Tasks';
 import { Report } from './Report';
+import { Proposals } from './Proposals';
 import { Connect } from './Connect';
 
 export function Dashboard() {
   const { token, connected, setConnected, hydratePresence, applyPresence, hydrateFeed, pushFeed, setOwnership, logout } =
     useStore();
-  const [view, setView] = useState<'board' | 'report' | 'connect'>('board');
+  const [view, setView] = useState<'board' | 'proposals' | 'report' | 'connect'>('board');
   const { data: project } = useQuery({ queryKey: ['project'], queryFn: () => api<ProjectInfo>('/projects/current') });
 
   useEffect(() => {
@@ -47,6 +48,16 @@ export function Dashboard() {
         case 'NOTE_ADDED':
           void queryClient.invalidateQueries({ queryKey: ['notes'] });
           break;
+        case 'PROPOSAL_UPDATED':
+        case 'VOTE_CAST':
+          void queryClient.invalidateQueries({ queryKey: ['proposals'] });
+          break;
+        case 'COMMENT_ADDED': {
+          const c = msg.payload as { targetType?: string; targetId?: string };
+          if (c?.targetType && c?.targetId) void queryClient.invalidateQueries({ queryKey: ['comments', c.targetType, c.targetId] });
+          if (c?.targetType === 'proposal') void queryClient.invalidateQueries({ queryKey: ['proposals'] });
+          break;
+        }
         default:
           break;
       }
@@ -64,6 +75,7 @@ export function Dashboard() {
         <span className={`conn ${connected ? 'on' : 'off'}`}>{connected ? 'live' : 'connecting…'}</span>
         <nav className="view-tabs">
           <button className={view === 'board' ? 'active' : ''} onClick={() => setView('board')}>Board</button>
+          <button className={view === 'proposals' ? 'active' : ''} onClick={() => setView('proposals')}>Proposals</button>
           <button className={view === 'report' ? 'active' : ''} onClick={() => setView('report')}>Report</button>
           <button className={view === 'connect' ? 'active' : ''} onClick={() => setView('connect')}>Connect agent</button>
         </nav>
@@ -82,6 +94,8 @@ export function Dashboard() {
             <Feed />
           </div>
         </main>
+      ) : view === 'proposals' ? (
+        <Proposals />
       ) : view === 'report' ? (
         <Report />
       ) : (

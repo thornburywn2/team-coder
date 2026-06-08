@@ -153,6 +153,50 @@ export interface Report {
   totals: { commits: number; linesAdded: number; tasksCompleted: number; activeMinutes: number };
 }
 
+// ── Messaging + proposals ────────────────────────────────────────────────────
+export type VoteValue = 'approve' | 'reject' | 'abstain';
+export type ProposalStatus = 'draft' | 'open' | 'accepted' | 'rejected' | 'withdrawn';
+
+export interface Proposal {
+  id: string;
+  title: string;
+  description: string | null;
+  status: ProposalStatus;
+  authorId: string | null;
+  experimentBranch: string | null;
+  createdAt: string;
+  updatedAt: string;
+  tally: { approve: number; reject: number; abstain: number };
+  votes: { voterId: string; vote: VoteValue }[];
+  commentCount: number;
+}
+
+export interface Comment {
+  id: string;
+  authorId: string;
+  targetType: string;
+  targetId: string;
+  parentId: string | null;
+  content: string;
+  createdAt: string;
+}
+
+export function createProposal(p: { title: string; description?: string; experimentBranch?: string }, authorId?: string | null) {
+  return api<Proposal>('/proposals', { method: 'POST', body: JSON.stringify({ ...p, authorId }) });
+}
+export function voteProposal(id: string, vote: VoteValue, voterId: string | null) {
+  return api(`/proposals/${id}/vote`, { method: 'POST', body: JSON.stringify({ vote, voterId }) });
+}
+export function setProposalStatus(id: string, status: ProposalStatus, actorId: string | null) {
+  return api<Proposal>(`/proposals/${id}/status`, { method: 'POST', body: JSON.stringify({ status, actorId }) });
+}
+export function listComments(targetType: string, targetId: string) {
+  return api<Comment[]>(`/comments?targetType=${targetType}&targetId=${targetId}`);
+}
+export function postComment(targetType: string, targetId: string, content: string, authorId: string | null, parentId?: string) {
+  return api<Comment>('/comments', { method: 'POST', body: JSON.stringify({ targetType, targetId, content, authorId, parentId }) });
+}
+
 export interface ModuleOwnership {
   moduleId: string;
   name: string;

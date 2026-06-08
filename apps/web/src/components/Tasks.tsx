@@ -3,6 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { api, type Task, type User } from '../lib/api';
 import { queryClient } from '../lib/query';
 import { useStore } from '../store';
+import { Thread } from './Thread';
 
 // Task list with soft claim/done. Claiming never blocks — it just makes
 // ownership visible. Overall progress = done / total.
@@ -13,6 +14,7 @@ export function Tasks() {
   const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => api<User[]>('/users') });
   const userById = Object.fromEntries(users.map((u) => [u.id, u]));
   const [title, setTitle] = useState('');
+  const [openThread, setOpenThread] = useState<string | null>(null);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['tasks'] });
 
@@ -50,25 +52,30 @@ export function Tasks() {
       <ul>
         {tasks.map((t) => {
           const owner = t.assigneeId ? userById[t.assigneeId] : undefined;
+          const open = openThread === t.id;
           return (
             <li key={t.id} className={`task task-${t.status}`}>
-              <span className={`badge ${t.status}`}>{t.status.replace('_', ' ')}</span>
-              {t.source === 'prd' && <span className="goal-tag" title="from the project goal (PRD)">🎯</span>}
-              <span className="task-title">{t.title}</span>
-              {owner && (
-                <span className="owner">
-                  <span className="dot sm" style={{ background: owner.color ?? '#888' }} />
-                  {owner.displayName ?? owner.username}
-                </span>
-              )}
-              <span className="task-actions">
-                {t.status !== 'done' && (
-                  <>
-                    <button onClick={() => claim.mutate(t.id)}>Claim</button>
-                    <button onClick={() => done.mutate(t.id)}>Done</button>
-                  </>
+              <div className="task-row">
+                <span className={`badge ${t.status}`}>{t.status.replace('_', ' ')}</span>
+                {t.source === 'prd' && <span className="goal-tag" title="from the project goal (PRD)">🎯</span>}
+                <span className="task-title">{t.title}</span>
+                {owner && (
+                  <span className="owner">
+                    <span className="dot sm" style={{ background: owner.color ?? '#888' }} />
+                    {owner.displayName ?? owner.username}
+                  </span>
                 )}
-              </span>
+                <span className="task-actions">
+                  <button onClick={() => setOpenThread(open ? null : t.id)}>💬</button>
+                  {t.status !== 'done' && (
+                    <>
+                      <button onClick={() => claim.mutate(t.id)}>Claim</button>
+                      <button onClick={() => done.mutate(t.id)}>Done</button>
+                    </>
+                  )}
+                </span>
+              </div>
+              {open && <Thread targetType="task" targetId={t.id} />}
             </li>
           );
         })}

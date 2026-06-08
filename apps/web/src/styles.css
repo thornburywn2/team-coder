@@ -93,7 +93,8 @@ main { display: grid; grid-template-columns: 1fr 360px; gap: 1rem; align-items: 
 .new-task input { flex: 1; padding: 0.45rem; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); }
 .new-task button { padding: 0.45rem 0.8rem; border: none; border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; }
 .tasks ul, .feed ul { list-style: none; margin: 0; padding: 0; }
-.task { display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0; border-top: 1px solid var(--border); }
+.task { padding: 0.45rem 0; border-top: 1px solid var(--border); }
+.task-row { display: flex; align-items: center; gap: 0.5rem; }
 .task-title { flex: 1; }
 .badge { font-size: 0.65rem; text-transform: uppercase; padding: 0.1rem 0.4rem; border-radius: 4px; background: var(--panel-2); color: var(--muted); }
 .badge.in_progress { color: var(--amber); }
@@ -217,6 +218,39 @@ main { display: grid; grid-template-columns: 1fr 360px; gap: 1rem; align-items: 
 .dc-mod { font-size: 0.65rem; color: var(--accent); background: rgba(91,140,255,0.12); padding: 0.1rem 0.4rem; border-radius: 4px; flex: none; }
 .dc-commit { width: 100%; background: var(--green); color: #06210b; border: none; border-radius: 8px; padding: 0.55rem; font-weight: 700; cursor: pointer; }
 .dc-commit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Proposals ─────────────────────────────────────────── */
+.proposals-view { display: flex; flex-direction: column; gap: 0.8rem; max-width: 820px; }
+.proposals-head { display: flex; align-items: center; gap: 0.75rem; }
+.proposals-head h2 { margin: 0; font-size: 1rem; flex: 1; }
+.new-proposal { display: flex; flex-direction: column; gap: 0.5rem; background: var(--panel-2); }
+.new-proposal input, .new-proposal textarea { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 0.5rem; font-family: inherit; }
+.new-proposal textarea { resize: vertical; }
+.proposal .prop-head { display: flex; align-items: center; gap: 0.5rem; }
+.prop-title { flex: 1; }
+.prop-desc { color: var(--muted); margin: 0.5rem 0; font-size: 0.88rem; white-space: pre-wrap; }
+.prop-branch { display: inline-block; font-size: 0.72rem; color: var(--accent); background: rgba(91,140,255,0.12); padding: 0.1rem 0.45rem; border-radius: 4px; margin-bottom: 0.5rem; }
+.prop-votes { display: flex; gap: 0.5rem; margin: 0.5rem 0; flex-wrap: wrap; }
+.vote-btn { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); padding: 0.3rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; }
+.vote-btn.mine { border-color: var(--accent); background: rgba(91,140,255,0.18); }
+.vote-btn .tally { color: var(--muted); font-weight: 700; margin-left: 0.2rem; }
+.prop-actions { display: flex; align-items: center; gap: 0.75rem; }
+.prop-actions .status-actions { margin-left: auto; display: flex; gap: 0.5rem; }
+.badge.prop-open { color: var(--amber); }
+.badge.prop-accepted { color: var(--green); }
+.badge.prop-rejected, .badge.prop-withdrawn { color: var(--gray); }
+
+/* ── Threads (messaging) ───────────────────────────────── */
+.thread { margin-top: 0.6rem; border-top: 1px dashed var(--border); padding-top: 0.5rem; }
+.cmts { list-style: none; margin: 0 0 0.5rem; padding: 0; }
+.cmts.nested { margin-left: 1.25rem; }
+.cmt { display: flex; align-items: baseline; gap: 0.4rem; padding: 0.25rem 0; font-size: 0.82rem; }
+.cmt .who { font-weight: 600; flex: none; }
+.cmt .cmt-body { flex: 1; word-break: break-word; }
+.cmt .time { color: var(--gray); font-size: 0.7rem; flex: none; }
+.new-cmt { display: flex; gap: 0.5rem; }
+.new-cmt input { flex: 1; padding: 0.4rem; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); }
+.new-cmt button { padding: 0.4rem 0.7rem; border: none; border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; }
 
 /* ── Notes panel ───────────────────────────────────────── */
 .notes ul { list-style: none; margin: 0; padding: 0; }

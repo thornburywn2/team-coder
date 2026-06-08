@@ -11,7 +11,9 @@ export const WS_SERVER_MSG = [
   'ACTIVITY_EVENT',
   'OWNERSHIP_UPDATE',
   'COLLISION_WARNING',
-  'PROPOSAL_UPDATED',
+  'PROPOSAL_UPDATED', // a proposal was created / changed status
+  'VOTE_CAST', // a vote landed on a proposal (payload: { proposalId })
+  'COMMENT_ADDED', // a comment was posted on a task or proposal
   'NOTE_ADDED', // a project note was posted (project_notes insert)
 ] as const;
 export type WsServerMsgType = (typeof WS_SERVER_MSG)[number];

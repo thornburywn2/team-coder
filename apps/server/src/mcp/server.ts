@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { and, desc, eq, ilike, ne, or, type SQL } from 'drizzle-orm';
-import { TASK_STATUS } from '@team-coder/shared';
+import { TASK_STATUS, VOTE_VALUE } from '@team-coder/shared';
 import { db, schema } from '../db';
 import type { Developer } from '../auth';
 import { computeOwnership } from '../ownership';
@@ -130,8 +130,63 @@ export function createMcpServer(dev: Developer): McpServer {
     },
   );
 
+  server.registerTool(
+    'get_proposals',
+    { description: 'Open design proposals (ideas / direction changes) and their vote tallies. Read before proposing or voting so you do not duplicate.', inputSchema: {} },
+    async () => {
+      const [props, votes] = await Promise.all([
+        db.select({ id: schema.proposals.id, title: schema.proposals.title, description: schema.proposals.description, status: schema.proposals.status, experimentBranch: schema.proposals.experimentBranch }).from(schema.proposals).where(eq(schema.proposals.projectId, pid)).orderBy(desc(schema.proposals.createdAt)).limit(25),
+        db.select({ proposalId: schema.votes.proposalId, vote: schema.votes.vote }).from(schema.votes).where(eq(schema.votes.projectId, pid)),
+      ]);
+      return text(props.map((p) => {
+        const tally = { approve: 0, reject: 0, abstain: 0 };
+        for (const v of votes) if (v.proposalId === p.id) tally[v.vote] += 1;
+        return { ...p, tally };
+      }));
+    },
+  );
+
   // ── WRITE ──────────────────────────────────────────────────────────────────
   const feedBase = { developerId: dev.id, developer: me, color: dev.color ?? undefined };
+
+  server.registerTool(
+    'create_proposal',
+    {
+      description: 'Raise a design proposal / idea for the team to vote on. Optionally tie it to an experiment branch (prove-then-inherit).',
+      inputSchema: { title: z.string(), description: z.string().optional(), experiment_branch: z.string().optional() },
+    },
+    async ({ title, description, experiment_branch }) => {
+      const [row] = await db.insert(schema.proposals).values({ projectId: pid, title, description: description ?? null, experimentBranch: experiment_branch ?? null, authorId: dev.id, status: 'open' }).returning({ id: schema.proposals.id, title: schema.proposals.title });
+      pushFeed(pid, { ...feedBase, kind: 'proposal', detail: `proposed "${row!.title}"` });
+      return text({ ok: true, proposal: row });
+    },
+  );
+
+  server.registerTool(
+    'vote_proposal',
+    { description: 'Vote on a proposal (one vote per person; re-voting updates it).', inputSchema: { proposal_id: z.string(), vote: z.enum(VOTE_VALUE), comment: z.string().optional() } },
+    async ({ proposal_id, vote, comment }) => {
+      const [prop] = await db.select({ id: schema.proposals.id, title: schema.proposals.title }).from(schema.proposals).where(and(eq(schema.proposals.id, proposal_id), eq(schema.proposals.projectId, pid)));
+      if (!prop) return text({ error: 'proposal not found' });
+      await db.insert(schema.votes).values({ projectId: pid, proposalId: proposal_id, voterId: dev.id, vote, comment: comment ?? null })
+        .onConflictDoUpdate({ target: [schema.votes.proposalId, schema.votes.voterId], set: { vote, comment: comment ?? null } });
+      pushFeed(pid, { ...feedBase, kind: 'vote', detail: `voted ${vote} on "${prop.title}"` });
+      return text({ ok: true });
+    },
+  );
+
+  server.registerTool(
+    'post_comment',
+    {
+      description: 'Comment on a task or proposal to discuss it (anchored thread, not chat).',
+      inputSchema: { target_type: z.enum(['task', 'proposal']), target_id: z.string(), content: z.string() },
+    },
+    async ({ target_type, target_id, content }) => {
+      const [row] = await db.insert(schema.comments).values({ projectId: pid, authorId: dev.id, targetType: target_type, targetId: target_id, content }).returning({ id: schema.comments.id });
+      pushFeed(pid, { ...feedBase, kind: 'comment', detail: `commented on a ${target_type}` });
+      return text({ ok: true, comment: row });
+    },
+  );
 
   server.registerTool(
     'create_task',
