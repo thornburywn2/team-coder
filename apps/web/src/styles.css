@@ -80,6 +80,12 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .blockers li, .live-agents li, .open-proposals li { display: flex; align-items: center; gap: 0.45rem; padding: 0.4rem 0; border-top: 1px solid var(--border); font-size: 0.82rem; }
 .blockers .task-title, .open-proposals .prop-title { flex: 1; word-break: break-word; }
 .blockers { border-color: rgba(255,107,107,0.4); }
+.my-work ul, .stale-tasks ul { list-style: none; margin: 0; padding: 0; }
+.my-work li, .stale-tasks li { display: flex; align-items: center; gap: 0.45rem; padding: 0.4rem 0; border-top: 1px solid var(--border); font-size: 0.82rem; }
+.my-work .task-title, .stale-tasks .task-title { flex: 1; word-break: break-word; }
+.my-work .link-btn { padding: 0 !important; flex: none; }
+.stale-tasks { border-color: rgba(245,166,35,0.35); }
+.stale-tasks .time { flex: none; color: var(--amber); }
 .open-proposals li { cursor: pointer; }
 .open-proposals li:hover .prop-title { color: var(--accent); }
 .open-proposals .tally, .live-agents .time { margin-left: auto; flex: none; }

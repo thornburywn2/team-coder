@@ -18,6 +18,8 @@ import { LiveAgents } from './LiveAgents';
 import { OpenProposals } from './OpenProposals';
 import { RepoStatus } from './RepoStatus';
 import { Burndown } from './Burndown';
+import { MyWork } from './MyWork';
+import { StaleTasks } from './StaleTasks';
 import { Report } from './Report';
 import { Proposals } from './Proposals';
 import { Patterns } from './Patterns';
@@ -115,14 +117,20 @@ export function Dashboard() {
           </div>
           <div className="board-grid">
             <div className="w8"><Board /></div>
-            <div className="w4"><LiveAgents /></div>
+            <div className="w4 col-stack">
+              <MyWork />
+              <LiveAgents />
+            </div>
             <div className="w8"><Tasks /></div>
             <div className="w4 col-stack">
               <Blockers />
-              <OpenProposals onOpen={() => setView('proposals')} />
+              <StaleTasks />
             </div>
             <div className="w8"><Burndown /></div>
-            <div className="w4"><RepoStatus /></div>
+            <div className="w4 col-stack">
+              <OpenProposals onOpen={() => setView('proposals')} />
+              <RepoStatus />
+            </div>
             <div className="w6"><Notes /></div>
             <div className="w6"><Feed /></div>
             <div className="w12"><Ownership /></div>
