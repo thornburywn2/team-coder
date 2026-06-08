@@ -4,6 +4,32 @@
 
 ---
 
+## 2026-06-08 (g) — 2nd project + live repo sync + widget board
+
+**Scope:** apps/server (git-poll/broadcast, summary, repo-status), apps/web (board redesign + widgets), agent-kit (sync), demo-seed-apollo
+**Outcome:** SUCCESS
+
+- **2nd demo project (Apollo)** linked to a real GitHub repo (testtesttest) — proves
+  multi-project isolation AND the git lane end-to-end (I pushed a multi-author
+  history; Team Coder clones/mirrors/polls/attributes; report built from real LOC).
+- **Server git-poll + safe local sync:** `gitPollAndBroadcast()` emits `REPO_UPDATED`
+  on new commits; `GET /api/repo/status`; enabled per-project via `ENABLE_GIT_POLL`
+  (Nimbus's repo url nulled so it's never polluted). `agent-kit/team-coder-sync.sh`
+  keeps each engineer's clone fast-forwarded — never resets/stashes/forces; dirty or
+  diverged → fetch + notify only. Verified: pushed a commit → server auto-ingested
+  within the interval (15→16), report updated, Nimbus untouched.
+- **Board → full-page widget dashboard:** 12-col responsive grid; new widgets —
+  KPI strip (`GET /api/summary`), 🚧 Blockers, 🤖 Live agents, 🗳️ Open proposals; Notes
+  enlarged. Fixed verify-gitpoll to scope by project (demo carol commits leaked
+  into its global query). All 18 verify green.
+
+**Lesson:** "maintain the repo" for a collaboration tool = keep an up-to-date
+*mirror* + fast-forward clients; never write to engineers' working copies. And demo
+data can expose test scripts that query globally instead of per-project — always
+scope test assertions to the test's own project.
+
+---
+
 ## 2026-06-08 (f) — Demo data loader (fully-loaded 3-day project)
 
 **Scope:** apps/server/src/db/demo-seed.ts, DEMO.md
