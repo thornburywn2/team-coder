@@ -4,6 +4,32 @@
 
 ---
 
+## 2026-06-08 (e) — Team awards, idle alerts, Connect token-prefill + Code Puppy
+
+**Scope:** apps/server (awards, idle, leaderboard), apps/web (Agents, Connect), docs
+**Outcome:** SUCCESS
+
+- **Team awards** (reframed the leaderboard — user: "everyone should get an award,
+  it's a team event, nothing negative"): `lib/awards.ts` gives every coder one
+  positive award — distinct superlatives for category leaders, focus-based awards
+  (Frontend Champion / Data Wizard / `<Lang>` Specialist / Team Player) for the
+  rest. `GET /api/leaderboard` returns awards built from the full report + live
+  agent counts; Agents view shows an award card per person.
+- **Idle alerts:** `idle.ts` flags agents that went quiet (5–30 min) once per idle
+  spell (re-arms on return) as a durable feed event; Agents view "quiet agents"
+  panel; 😴 feed icon.
+- **Connect token-prefill:** added a ready-to-paste `.mcp.json` with the coder's
+  token baked in (no env vars) + a dedicated **Code Puppy** section (MCP-native,
+  same config + an AGENTS.md coordination snippet, links the repo).
+
+`verify:extras` extended (everyone-gets-an-award, Grace="Data Wizard"); all 18 green.
+
+**Lesson:** Gamification for a *team* should surface everyone's strength, not rank
+winners/losers — assign distinct superlatives to leaders, then celebrate everyone
+else's focus area so no one is left without recognition.
+
+---
+
 ## 2026-06-08 (d) — Per-coder breakdown + weeks-long durable capture
 
 **Scope:** apps/server (report, feed, schema), apps/web

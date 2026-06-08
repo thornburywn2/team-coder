@@ -49,17 +49,23 @@ while the agents pull live context over MCP.
 - Browse + publish reusable code patterns (with copy button), filter by tag.
   Adopted proposals land here automatically.
 
-### 5. Agents — who/which agent is live *(new)*
+### 5. Agents — who/which agent is live, team awards *(new)*
 - Every running session shows up as an **agent**, grouped under its coder — so one
   person driving **multiple agents** shows multiple entries. Per-agent stats:
   prompts, tool calls, files touched, active minutes, current file, status.
+- **🏆 Team awards:** everyone gets a positive award for a real strength (The
+  Closer, Heavy Lifter, Data Wizard, Frontend Champion, …) — it's a team event,
+  nothing negative.
+- **😴 Idle alerts:** an agent that goes quiet is flagged here and in the feed, so
+  a stalled/abandoned agent gets noticed.
 
 ### 6. Report — who built what *(now with language + stack analysis)*
 - Blended contribution % per coder (commits · lines · tasks · edits), module
-  breakdown, and **two new lenses**: **Languages** (TypeScript/Python/SQL/…) and
-  **Where in the stack** (frontend / backend / database / infra / docs). Uses git
-  LOC when a repo is configured, otherwise live edit activity. Export JSON / Markdown
-  / Print-PDF.
+  breakdown, and **Languages** (TypeScript/Python/SQL/…) + **Where in the stack**
+  (frontend / backend / database / infra / docs) — **both team-wide and per coder**
+  (chips under each person). Uses git LOC when a repo is configured, otherwise live
+  edit activity; the timeline rolls up to daily buckets for multi-day projects.
+  Export JSON / Markdown / Print-PDF.
 
 ### 7. Connect — wire up your agent
 - Your agent token + copy-paste MCP command and hooks config (filled in for you).
