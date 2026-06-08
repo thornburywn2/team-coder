@@ -4,6 +4,30 @@
 
 ---
 
+## 2026-06-08 (j) — Trust the data: token capture + attribution
+
+**Scope:** GAPS §2 (token capture) + §5 (attribution) — all severities
+**Outcome:** SUCCESS
+
+- **Automatic token capture.** `agent-kit/hooks/report-tokens.ts` (Stop/SubagentStop
+  command hook) reads the local transcript, sums per-turn usage + model, reports
+  cumulative totals with `mode:set` (idempotent). `/hooks/usage` + `report_usage`
+  gain mode/model/cache. sessions +cache+model (migration 0010).
+- **Cost + per-model.** `lib/pricing.ts` (configurable `TOKEN_RATES_JSON`); `/api/usage`
+  returns per-coder $ + per-model + total; Report + markdown export show it.
+- **Attribution fixed.** `users.git_emails[]`; git-poll matches any; 🔗 Attribution
+  panel surfaces unmapped authors and maps→backfills existing commits/file-changes.
+  Non-ff pull hard-resets the read-only mirror; log cap → 5000 (`GIT_LOG_LIMIT`).
+- Board stays work-only; metrics live in the Report. New verify-attribution; full
+  suite green (20 scripts). Demo seeds models/cache (Nimbus ≈ $86 est., Opus top).
+
+**Lesson:** make telemetry self-serve and idempotent — capture from the transcript
+(client-side, where the data is), report cumulative with set-semantics so retries
+don't inflate, and make wrong/missing attribution *fixable in the UI with backfill*
+rather than something the user must get right up front.
+
+---
+
 ## 2026-06-08 (i) — Work-locks, token trend, board IA, vote 500 fix
 
 **Scope:** apps/server (locks, usage trend, vote/comment hardening), apps/web (widgets, IA, identity revalidation), agent-kit
