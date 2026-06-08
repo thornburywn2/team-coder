@@ -86,7 +86,8 @@ try {
   // ── sessions (agents) — historical + some live-now + one idle ──────────────
   const sess: (typeof schema.sessions.$inferInsert)[] = [];
   const mkSess = (uname: string, startMs: number, lastMs: number, prompts: number, tools: number, id?: string) =>
-    sess.push({ sessionId: id ?? `demo-${uname}-${crypto.randomUUID().slice(0, 8)}`, projectId: pid, developerId: U[uname]!.id, project: 'product', startedAt: ago(startMs), lastSeenAt: ago(lastMs), promptCount: prompts, toolCount: tools });
+    sess.push({ sessionId: id ?? `demo-${uname}-${crypto.randomUUID().slice(0, 8)}`, projectId: pid, developerId: U[uname]!.id, project: 'product', startedAt: ago(startMs), lastSeenAt: ago(lastMs), promptCount: prompts, toolCount: tools,
+      inputTokens: tools * rand(1200, 2600) + prompts * rand(3000, 6000), outputTokens: (tools + prompts) * rand(700, 1700) });
   // historical sessions across 3 days (counts feed the report + leaderboard)
   for (const uname of need) {
     const sessions = uname === 'bob' ? 6 : uname === 'alice' ? 5 : 4; // Bob = Master Builder (tools)

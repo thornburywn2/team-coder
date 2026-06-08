@@ -22,14 +22,15 @@ import { Burndown } from './Burndown';
 import { MyWork } from './MyWork';
 import { StaleTasks } from './StaleTasks';
 import { Report } from './Report';
-import { Proposals } from './Proposals';
+import { Decisions } from './Proposals';
 import { Patterns } from './Patterns';
+import { TokenUsage } from './TokenUsage';
 import { Connect } from './Connect';
 
 export function Dashboard() {
   const { token, connected, setConnected, hydratePresence, applyPresence, hydrateFeed, pushFeed, setOwnership, hydrateCollisions, pushCollision, logout } =
     useStore();
-  const [view, setView] = useState<'board' | 'proposals' | 'patterns' | 'report' | 'connect'>('board');
+  const [view, setView] = useState<'board' | 'report' | 'connect'>('board');
   const { data: project } = useQuery({ queryKey: ['project'], queryFn: () => api<ProjectInfo>('/projects/current') });
 
   useEffect(() => {
@@ -100,8 +101,6 @@ export function Dashboard() {
         <span className={`conn ${connected ? 'on' : 'off'}`}>{connected ? 'live' : 'connecting…'}</span>
         <nav className="view-tabs">
           <button className={view === 'board' ? 'active' : ''} onClick={() => setView('board')}>Board</button>
-          <button className={view === 'proposals' ? 'active' : ''} onClick={() => setView('proposals')}>Proposals</button>
-          <button className={view === 'patterns' ? 'active' : ''} onClick={() => setView('patterns')}>Reuse kit</button>
           <button className={view === 'report' ? 'active' : ''} onClick={() => setView('report')}>Report</button>
           <button className={view === 'connect' ? 'active' : ''} onClick={() => setView('connect')}>Connect agent</button>
         </nav>
@@ -130,20 +129,22 @@ export function Dashboard() {
               <Ownership />
               <RepoStatus />
             </div>
-            <div className="w6"><ProposalsWidget onOpenTab={() => setView('proposals')} /></div>
+            <div className="w6"><ProposalsWidget /></div>
+            <div className="w6"><Decisions /></div>
             <div className="w6"><Notes /></div>
             <div className="w6"><Feed /></div>
             <div className="w6"><Awards /></div>
+            <div className="w6"><TokenUsage /></div>
+
+            {/* Reuse kit — the shared pattern library, folded onto the board */}
+            <div className="w12 section-label" title="Reusable code patterns — pull before you rebuild">🧩 Reuse kit</div>
+            <div className="w12"><Patterns /></div>
 
             {/* Trends: larger charts live at the bottom */}
             <div className="w12 section-label" title="Progress over time — larger charts live here">📈 Trends</div>
             <div className="w12"><Burndown /></div>
           </div>
         </div>
-      ) : view === 'proposals' ? (
-        <Proposals />
-      ) : view === 'patterns' ? (
-        <Patterns />
       ) : view === 'report' ? (
         <Report />
       ) : (

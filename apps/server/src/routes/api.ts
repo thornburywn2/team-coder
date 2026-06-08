@@ -79,12 +79,13 @@ apiRoutes.post('/projects/current/decompose', async (c) => {
 apiRoutes.get('/summary', async (c) => {
   const pid = c.get('project').id;
   const since = new Date(Date.now() - 5 * 60_000);
-  const [taskAgg, presence, liveAgents, openProps, git] = await Promise.all([
+  const [taskAgg, presence, liveAgents, openProps, git, tok] = await Promise.all([
     db.select({ status: schema.tasks.status, n: count() }).from(schema.tasks).where(eq(schema.tasks.projectId, pid)).groupBy(schema.tasks.status),
     db.select({ status: schema.userPresence.status }).from(schema.userPresence).where(eq(schema.userPresence.projectId, pid)),
     db.select({ dev: schema.sessions.developerId }).from(schema.sessions).where(and(eq(schema.sessions.projectId, pid), isNotNull(schema.sessions.developerId), gte(schema.sessions.lastSeenAt, since))),
     db.select({ n: count() }).from(schema.proposals).where(and(eq(schema.proposals.projectId, pid), eq(schema.proposals.status, 'open'))),
     db.select({ commits: count(), lines: sql<number>`coalesce(sum(${schema.gitCommits.additions}),0)` }).from(schema.gitCommits).where(eq(schema.gitCommits.projectId, pid)),
+    db.select({ tokens: sql<number>`coalesce(sum(${schema.sessions.inputTokens} + ${schema.sessions.outputTokens}),0)` }).from(schema.sessions).where(eq(schema.sessions.projectId, pid)),
   ]);
   const tByStatus = Object.fromEntries(taskAgg.map((r) => [r.status, Number(r.n)]));
   const total = taskAgg.reduce((a, r) => a + Number(r.n), 0);
@@ -96,7 +97,27 @@ apiRoutes.get('/summary', async (c) => {
     openProposals: Number(openProps[0]?.n ?? 0),
     commits: Number(git[0]?.commits ?? 0),
     linesAdded: Number(git[0]?.lines ?? 0),
+    tokens: Number(tok[0]?.tokens ?? 0),
   });
+});
+
+// token usage per coder (input/output) — track + minimize spend; aggregated from
+// session rollups. Sorted by total desc.
+apiRoutes.get('/usage', async (c) => {
+  const pid = c.get('project').id;
+  const [users, agg] = await Promise.all([
+    db.select({ id: schema.users.id, displayName: schema.users.displayName, username: schema.users.username, color: schema.users.color }).from(schema.users).where(eq(schema.users.projectId, pid)),
+    db.select({ dev: schema.sessions.developerId, tin: sql<number>`coalesce(sum(${schema.sessions.inputTokens}),0)`, tout: sql<number>`coalesce(sum(${schema.sessions.outputTokens}),0)` }).from(schema.sessions).where(and(eq(schema.sessions.projectId, pid), isNotNull(schema.sessions.developerId))).groupBy(schema.sessions.developerId),
+  ]);
+  const byDev = new Map(agg.filter((r) => r.dev).map((r) => [r.dev as string, r]));
+  const coders = users
+    .map((u) => {
+      const a = byDev.get(u.id);
+      const tokensIn = Number(a?.tin ?? 0), tokensOut = Number(a?.tout ?? 0);
+      return { developerId: u.id, name: u.displayName ?? u.username, color: u.color, tokensIn, tokensOut, total: tokensIn + tokensOut };
+    })
+    .sort((a, b) => b.total - a.total);
+  return c.json({ coders, total: coders.reduce((s, c2) => s + c2.total, 0) });
 });
 
 // burndown — daily cumulative scope vs done (and remaining) over the project, so

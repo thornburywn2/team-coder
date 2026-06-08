@@ -470,6 +470,22 @@ export function createMcpServer(dev: Developer): McpServer {
     },
   );
 
+  server.registerTool(
+    'report_usage',
+    {
+      description: 'Report your token usage for this work so the team can track + minimize spend. Call periodically (e.g. per task or session) with cumulative or incremental input/output tokens.',
+      inputSchema: { input_tokens: z.number().int().nonnegative(), output_tokens: z.number().int().nonnegative(), session_id: z.string().optional() },
+    },
+    async ({ input_tokens, output_tokens, session_id }) => {
+      const sid = session_id?.trim() || `usage-${dev.id}`;
+      await db
+        .insert(schema.sessions)
+        .values({ sessionId: sid, projectId: pid, developerId: dev.id, project: null, inputTokens: input_tokens, outputTokens: output_tokens })
+        .onConflictDoUpdate({ target: schema.sessions.sessionId, set: { lastSeenAt: new Date(), inputTokens: sql`${schema.sessions.inputTokens} + ${input_tokens}`, outputTokens: sql`${schema.sessions.outputTokens} + ${output_tokens}` } });
+      return text({ ok: true });
+    },
+  );
+
   // ── RESOURCES (host auto-loads; lightweight snapshots) ───────────────────────
   server.registerResource(
     'project-state',

@@ -95,5 +95,10 @@ export const HookEventSchema = z.object({
   prompt: z.string().optional(),
   last_assistant_message: z.string().optional(),
   agent_transcript_path: z.string().optional(),
+  // optional token usage for this turn (Claude Code can report it on Stop/
+  // PostToolUse, or a wrapper can attach it) — accept both shapes.
+  input_tokens: z.number().int().nonnegative().optional(),
+  output_tokens: z.number().int().nonnegative().optional(),
+  usage: z.object({ input_tokens: z.number().int().nonnegative().optional(), output_tokens: z.number().int().nonnegative().optional() }).optional(),
 });
 export type HookEventPayload = z.infer<typeof HookEventSchema>;

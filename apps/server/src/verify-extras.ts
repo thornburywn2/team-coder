@@ -77,6 +77,13 @@ try {
   check(awards.every((a) => a.award && a.award.title.length > 0 && !!a.award.emoji), 'every member received a non-empty award');
   const graceAward = awards.find((a) => a.name === 'Grace Hopper')?.award;
   check(graceAward?.title === 'Data Wizard', `Grace celebrated for her database focus (got "${graceAward?.title}")`);
+
+  // token usage capture (per person) + aggregation
+  await fetch(`${BASE}/hooks/usage`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${ada!.agentToken}` }, body: JSON.stringify({ input_tokens: 5000, output_tokens: 2000, session_id: 'usage-test' }) });
+  const usage = (await (await fetch(`${BASE}/api/usage`, { headers: hdr(proj.token) })).json()) as { coders: Array<{ name: string; total: number }>; total: number };
+  const adaU = usage.coders.find((c) => c.name === 'Ada Lovelace');
+  check((adaU?.total ?? 0) >= 7000, `token usage captured + attributed to Ada (${adaU?.total})`);
+  check(usage.total >= 7000, `team token total aggregated (${usage.total})`);
 } catch (err) {
   console.error('❌', err instanceof Error ? err.message : err);
   ok = false;

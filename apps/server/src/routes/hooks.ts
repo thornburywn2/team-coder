@@ -31,6 +31,22 @@ hookRoutes.post('/event', async (c) => {
   return c.json({ ok: true });
 });
 
+// Report token usage for attribution (any client: a Stop hook, a wrapper, or the
+// MCP report_usage tool). Rolled up onto the session (→ per-coder + team totals).
+hookRoutes.post('/usage', async (c) => {
+  const dev = c.get('developer');
+  const body = (await c.req.json().catch(() => ({}))) as { session_id?: string; input_tokens?: number; output_tokens?: number };
+  const tIn = Math.max(0, Math.floor(body.input_tokens ?? 0));
+  const tOut = Math.max(0, Math.floor(body.output_tokens ?? 0));
+  const sid = body.session_id?.trim() || `usage-${dev.id}`;
+  touchHook(dev.id, dev.projectId);
+  await db
+    .insert(schema.sessions)
+    .values({ sessionId: sid, projectId: dev.projectId, developerId: dev.id, project: null, inputTokens: tIn, outputTokens: tOut })
+    .onConflictDoUpdate({ target: schema.sessions.sessionId, set: { lastSeenAt: new Date(), inputTokens: sql`${schema.sessions.inputTokens} + ${tIn}`, outputTokens: sql`${schema.sessions.outputTokens} + ${tOut}` } });
+  return c.json({ ok: true });
+});
+
 function fileFromTool(ev: HookEventPayload): string | undefined {
   if (ev.tool_name === 'Write' || ev.tool_name === 'Edit' || ev.tool_name === 'NotebookEdit') {
     const fp = ev.tool_input?.['file_path'];
@@ -50,6 +66,8 @@ async function ingest(dev: Developer, ev: HookEventPayload): Promise<void> {
   const isPrompt = ev.hook_event_name === 'UserPromptSubmit';
   const isTool = ev.hook_event_name === 'PreToolUse' || ev.hook_event_name === 'PostToolUse';
   const status = ev.hook_event_name === 'Stop' ? 'idle' : 'active';
+  const tIn = ev.input_tokens ?? ev.usage?.input_tokens ?? 0;
+  const tOut = ev.output_tokens ?? ev.usage?.output_tokens ?? 0;
 
   // presence patch — only set fields the event actually informs
   const presence: Record<string, unknown> = {
@@ -76,13 +94,15 @@ async function ingest(dev: Developer, ev: HookEventPayload): Promise<void> {
     db
       .insert(schema.sessions)
       // count this first event too (defaults are 0; the upsert path increments later)
-      .values({ sessionId: ev.session_id, projectId: dev.projectId, developerId: dev.id, project, promptCount: isPrompt ? 1 : 0, toolCount: isTool ? 1 : 0 })
+      .values({ sessionId: ev.session_id, projectId: dev.projectId, developerId: dev.id, project, promptCount: isPrompt ? 1 : 0, toolCount: isTool ? 1 : 0, inputTokens: tIn, outputTokens: tOut })
       .onConflictDoUpdate({
         target: schema.sessions.sessionId,
         set: {
           lastSeenAt: new Date(),
           promptCount: sql`${schema.sessions.promptCount} + ${isPrompt ? 1 : 0}`,
           toolCount: sql`${schema.sessions.toolCount} + ${isTool ? 1 : 0}`,
+          inputTokens: sql`${schema.sessions.inputTokens} + ${tIn}`,
+          outputTokens: sql`${schema.sessions.outputTokens} + ${tOut}`,
         },
       }),
     db.update(schema.userPresence).set(presence).where(eq(schema.userPresence.userId, dev.id)),

@@ -135,6 +135,8 @@ export interface CoderStat {
   edits: number;
   prompts: number;
   toolCalls: number;
+  tokensIn: number;
+  tokensOut: number;
   activeMinutes: number;
   tasksCompleted: number;
   decisions: number;
@@ -167,7 +169,7 @@ export interface Report {
   languages: Breakdown[];
   layers: Breakdown[];
   analysisBasis: 'lines' | 'edits';
-  totals: { commits: number; linesAdded: number; tasksCompleted: number; activeMinutes: number };
+  totals: { commits: number; linesAdded: number; tasksCompleted: number; activeMinutes: number; tokensIn: number; tokensOut: number };
 }
 
 export interface Agent {
@@ -306,6 +308,7 @@ export interface Summary {
   openProposals: number;
   commits: number;
   linesAdded: number;
+  tokens: number;
 }
 
 export function getSummary() {
@@ -319,6 +322,14 @@ export interface RepoStatus {
 }
 export function getRepoStatus() {
   return api<RepoStatus>('/repo/status');
+}
+
+export interface Usage {
+  coders: { developerId: string; name: string; color: string | null; tokensIn: number; tokensOut: number; total: number }[];
+  total: number;
+}
+export function getUsage() {
+  return api<Usage>('/usage');
 }
 
 export interface BurndownPoint { date: string; scope: number; done: number; remaining: number }

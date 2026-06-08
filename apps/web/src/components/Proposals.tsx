@@ -20,7 +20,7 @@ const NEXT: { s: ProposalStatus; label: string }[] = [
   { s: 'withdrawn', label: 'Withdraw' },
 ];
 
-function NewProposal({ meId }: { meId: string | null }) {
+export function NewProposal({ meId }: { meId: string | null }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -97,7 +97,7 @@ function Card({ p, users, meId }: { p: Proposal; users: User[]; meId: string | n
   );
 }
 
-function Decisions() {
+export function Decisions() {
   const { data: decisions = [] } = useQuery({ queryKey: ['decisions'], queryFn: () => api<Decision[]>('/decisions') });
   if (decisions.length === 0) return null;
   return (

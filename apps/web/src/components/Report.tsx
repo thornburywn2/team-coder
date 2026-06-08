@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api, type Breakdown, type Report as ReportData } from '../lib/api';
 import { downloadFile, reportToMarkdown } from '../lib/report-export';
+import { fmtTokens } from './Kpis';
 
 const PALETTE = ['#5b8cff', '#3cb44b', '#f5a623', '#e6194B', '#911eb4', '#42d4f4', '#f032e6', '#bfef45', '#fabed4', '#469990'];
 
@@ -55,6 +56,10 @@ export function Report() {
           <Stat label="lines added" value={report.totals.linesAdded} />
           <Stat label="tasks done" value={report.totals.tasksCompleted} />
           <Stat label="active min" value={report.totals.activeMinutes} />
+          <div className="stat" title={`${(report.totals.tokensIn + report.totals.tokensOut).toLocaleString()} tokens — ${report.totals.tokensIn.toLocaleString()} in / ${report.totals.tokensOut.toLocaleString()} out`}>
+            <span className="stat-value">{fmtTokens(report.totals.tokensIn + report.totals.tokensOut)}</span>
+            <span className="stat-label">tokens used</span>
+          </div>
         </div>
       </section>
 
@@ -77,6 +82,7 @@ export function Report() {
                 <span>{c.tasksCompleted} tasks</span>
                 <span>{c.modulesOwned} modules</span>
                 <span>{c.activeMinutes}m active</span>
+                {(c.tokensIn + c.tokensOut) > 0 && <span title={`${c.tokensIn.toLocaleString()} in / ${c.tokensOut.toLocaleString()} out`}>{fmtTokens(c.tokensIn + c.tokensOut)} tokens</span>}
                 {c.decisions > 0 && <span>{c.decisions} ADRs</span>}
                 {c.patterns > 0 && <span>{c.patterns} patterns</span>}
               </div>

@@ -105,6 +105,15 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .pw-author { flex: none; }
 .pw-actions { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.4rem; flex-wrap: wrap; }
 .pw-discuss { margin-left: auto; }
+.pw-status { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.3rem; }
+
+/* token usage widget */
+.token-usage ul { list-style: none; margin: 0; padding: 0; }
+.token-usage li { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; border-top: 1px solid var(--border); font-size: 0.82rem; }
+.tu-name { width: 96px; flex: none; display: flex; align-items: center; gap: 0.3rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tu-bar { flex: 1; height: 10px; background: var(--panel-2); border-radius: 999px; overflow: hidden; }
+.tu-bar div { height: 100%; border-radius: 999px; }
+.tu-val { width: 52px; text-align: right; flex: none; color: var(--muted); }
 .open-proposals li { cursor: pointer; }
 .open-proposals li:hover .prop-title { color: var(--accent); }
 .open-proposals .tally, .live-agents .time { margin-left: auto; flex: none; }

@@ -19,6 +19,8 @@ export interface CoderStat {
   edits: number;
   prompts: number;
   toolCalls: number;
+  tokensIn: number;
+  tokensOut: number;
   activeMinutes: number;
   tasksCompleted: number;
   decisions: number;
@@ -56,7 +58,7 @@ export interface Report {
   languages: Breakdown[]; // what the team writes in
   layers: Breakdown[]; // where in the stack: frontend/backend/database/infra/docs
   analysisBasis: 'lines' | 'edits'; // git LOC if available, else live hook edits
-  totals: { commits: number; linesAdded: number; tasksCompleted: number; activeMinutes: number };
+  totals: { commits: number; linesAdded: number; tasksCompleted: number; activeMinutes: number; tokensIn: number; tokensOut: number };
 }
 
 const num = (v: unknown): number => Number(v ?? 0);
@@ -78,7 +80,7 @@ export async function buildReport(projectId: string, generatedAt: string): Promi
         .select({ dev: schema.hookEvents.developerId, n: count() })
         .from(schema.hookEvents).where(and(eq(schema.hookEvents.projectId, projectId), isNotNull(schema.hookEvents.developerId), inArray(schema.hookEvents.toolName, ['Write', 'Edit', 'NotebookEdit']))).groupBy(schema.hookEvents.developerId),
       db
-        .select({ dev: schema.sessions.developerId, minutes: sql<number>`coalesce(sum(extract(epoch from (${schema.sessions.lastSeenAt} - ${schema.sessions.startedAt})))/60,0)`, tools: sql<number>`coalesce(sum(${schema.sessions.toolCount}),0)`, prompts: sql<number>`coalesce(sum(${schema.sessions.promptCount}),0)` })
+        .select({ dev: schema.sessions.developerId, minutes: sql<number>`coalesce(sum(extract(epoch from (${schema.sessions.lastSeenAt} - ${schema.sessions.startedAt})))/60,0)`, tools: sql<number>`coalesce(sum(${schema.sessions.toolCount}),0)`, prompts: sql<number>`coalesce(sum(${schema.sessions.promptCount}),0)`, tokensIn: sql<number>`coalesce(sum(${schema.sessions.inputTokens}),0)`, tokensOut: sql<number>`coalesce(sum(${schema.sessions.outputTokens}),0)` })
         .from(schema.sessions).where(and(eq(schema.sessions.projectId, projectId), isNotNull(schema.sessions.developerId))).groupBy(schema.sessions.developerId),
       db
         .select({ dev: schema.tasks.assigneeId, n: count() })
@@ -138,6 +140,8 @@ export async function buildReport(projectId: string, generatedAt: string): Promi
     edits: num(edits.get(u.id)?.n),
     prompts: num(sess.get(u.id)?.prompts),
     toolCalls: num(sess.get(u.id)?.tools),
+    tokensIn: num(sess.get(u.id)?.tokensIn),
+    tokensOut: num(sess.get(u.id)?.tokensOut),
     activeMinutes: Math.round(num(sess.get(u.id)?.minutes)),
     tasksCompleted: num(tasksDone.get(u.id)?.n),
     decisions: num(adrs.get(u.id)?.n),
@@ -211,6 +215,6 @@ export async function buildReport(projectId: string, generatedAt: string): Promi
     languages: breakdown(teamRows, languageOf),
     layers: breakdown(teamRows, layerOf),
     analysisBasis,
-    totals: { commits: totCommits, linesAdded: totLines, tasksCompleted: totTasks, activeMinutes: sum((c) => c.activeMinutes) },
+    totals: { commits: totCommits, linesAdded: totLines, tasksCompleted: totTasks, activeMinutes: sum((c) => c.activeMinutes), tokensIn: sum((c) => c.tokensIn), tokensOut: sum((c) => c.tokensOut) },
   };
 }

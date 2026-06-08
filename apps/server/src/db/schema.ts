@@ -272,6 +272,8 @@ export const sessions = pgTable('sessions', {
   lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
   promptCount: integer('prompt_count').notNull().default(0),
   toolCount: integer('tool_count').notNull().default(0),
+  inputTokens: integer('input_tokens').notNull().default(0),
+  outputTokens: integer('output_tokens').notNull().default(0),
 });
 
 // Durable activity feed — every high-signal event, kept for the whole project so a
