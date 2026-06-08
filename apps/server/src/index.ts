@@ -10,6 +10,7 @@ import { wsRoute, websocket } from './ws';
 import { startDbListener } from './db/listener';
 import { refreshOwnership } from './ownership';
 import { pollGitAll } from './git-poll';
+import { checkIdle } from './idle';
 
 // ── Team Coder server (Bun runtime) ──────────────────────────────────────────
 // Mounts: /health, /api (REST, team-token gated), /ws (WebSocket fan-out).
@@ -73,6 +74,11 @@ const gitTick = () =>
     .catch((err) => console.error('[git-poll] failed:', err?.message ?? err));
 setInterval(gitTick, GIT_POLL_MS);
 gitTick();
+
+// Detect agents that went quiet and emit an idle alert (feed event). Every 60s.
+const idleTick = () => checkIdle().catch((err) => console.error('[idle] check failed:', err?.message ?? err));
+setInterval(idleTick, 60_000);
+idleTick();
 
 console.log(`[team-coder] server listening on http://0.0.0.0:${port}`);
 if (serveWeb) console.log(`[team-coder] serving web app (single-origin) from ${resolve(WEB_DIST)}`);

@@ -189,6 +189,27 @@ export function listAgents() {
   return api<Agent[]>('/agents');
 }
 
+export interface AwardEntry {
+  developerId: string;
+  name: string;
+  color: string | null;
+  award: { title: string; emoji: string; reason: string };
+  tasksDone: number;
+  prompts: number;
+  tools: number;
+  linesAdded: number;
+  filesTouched: number;
+  activeMinutes: number;
+  topLanguage: string | null;
+  topLayer: string | null;
+  activeAgents: number;
+}
+
+// Team awards (positive "leaderboard" — everyone gets one, reflecting a strength).
+export function getAwards() {
+  return api<AwardEntry[]>('/leaderboard');
+}
+
 // ── Messaging + proposals ────────────────────────────────────────────────────
 export type VoteValue = 'approve' | 'reject' | 'abstain';
 export type ProposalStatus = 'draft' | 'open' | 'accepted' | 'rejected' | 'withdrawn';

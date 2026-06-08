@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { and, desc, eq, gte, inArray, isNotNull } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, isNotNull } from 'drizzle-orm';
 import { db, schema } from '../db';
 import { teamAuth, type Project } from '../auth';
 import { getConnection, getConnections } from '../connections';
@@ -9,6 +9,7 @@ import { computeOwnership } from '../ownership';
 import { buildReport } from '../report';
 import { decomposePrd } from '../lib/decompose';
 import { decomposePrdLlm, llmEnabled } from '../lib/decompose-llm';
+import { computeAwards } from '../lib/awards';
 import { taskRoutes } from './tasks';
 import { proposalRoutes } from './proposals';
 import { commentRoutes } from './comments';
@@ -68,6 +69,39 @@ apiRoutes.get('/feed', async (c) => c.json(await recentFeed(c.get('project').id)
 
 // advisory concurrent-edit warnings (active, non-expired) for this project
 apiRoutes.get('/collisions', (c) => c.json(recentCollisions(c.get('project').id)));
+
+// team AWARDS — a positive "leaderboard": everyone gets an award reflecting a real
+// strength (nothing negative). Built from the full contribution report + live
+// agent counts. It's a team event — celebrate each person's strengths.
+apiRoutes.get('/leaderboard', async (c) => {
+  const pid = c.get('project').id;
+  const activeSince = new Date(Date.now() - 5 * 60_000);
+  const [report, activeAgg] = await Promise.all([
+    buildReport(pid, new Date().toISOString()),
+    db.select({ dev: schema.sessions.developerId, n: count() }).from(schema.sessions).where(and(eq(schema.sessions.projectId, pid), isNotNull(schema.sessions.developerId), gte(schema.sessions.lastSeenAt, activeSince))).groupBy(schema.sessions.developerId),
+  ]);
+  const active = new Map(activeAgg.filter((r) => r.dev).map((r) => [r.dev as string, Number(r.n)]));
+  const awards = computeAwards(report.coders);
+  const board = report.coders
+    .map((c2) => ({
+      developerId: c2.id,
+      name: c2.name,
+      color: c2.color,
+      award: awards.get(c2.id) ?? { title: 'Team Player', emoji: '🌟', reason: 'here for the team' },
+      tasksDone: c2.tasksCompleted,
+      prompts: c2.prompts,
+      tools: c2.toolCalls,
+      linesAdded: c2.linesAdded,
+      filesTouched: c2.filesTouched,
+      activeMinutes: c2.activeMinutes,
+      topLanguage: c2.languages[0]?.name ?? null,
+      topLayer: c2.layers[0]?.name ?? null,
+      activeAgents: active.get(c2.id) ?? 0,
+    }))
+    // most "active" first, but it's awards not ranks — everyone's celebrated
+    .sort((a, b) => b.tasksDone + b.tools - (a.tasksDone + a.tools));
+  return c.json(board);
+});
 
 // active AGENTS — each running session (a coder may drive several at once), with
 // per-agent stats. Powers "who/which agent is active right now".

@@ -18,6 +18,7 @@ const KIND_ICON: Record<string, string> = {
   proposal: '💡',
   vote: '🗳️',
   comment: '💬',
+  idle: '😴',
 };
 
 function ago(ts: number): string {

@@ -48,6 +48,19 @@ export function Connect() {
   const mcpCmd = `claude mcp add --transport http team-coder ${origin}/mcp \\
   --header "Authorization: Bearer ${token}"`;
 
+  // ready-to-paste project MCP config with THIS coder's token baked in (no env vars)
+  const mcpJson = JSON.stringify(
+    { mcpServers: { 'team-coder': { type: 'http', url: `${origin}/mcp`, headers: { Authorization: `Bearer ${token}` } } } },
+    null,
+    2,
+  );
+
+  // Code Puppy is MCP-native; same endpoint + a short AGENTS.md coordination note
+  const puppyAgents = `## Team coordination (Team Coder)
+Before starting, call the team-coder MCP tools: get_project_goal, get_my_tasks,
+get_module_context. Claim work with claim_task, report with update_task_progress,
+finish with complete_task. Check get_shared_patterns before building from scratch.`;
+
   const hooksJson = JSON.stringify(
     {
       hooks: Object.fromEntries(
@@ -92,14 +105,24 @@ export function Connect() {
       </section>
 
       <section className="panel">
-        <h2>1 · Connect the MCP server <span className="muted small">Claude Code / Code Puppy / any MCP client</span></h2>
-        <p className="muted small">Run this inside your product repo. It registers the Team Coder tools (claim tasks, ownership, decisions, patterns).</p>
+        <h2>1 · Connect the MCP server <span className="muted small">Claude Code — token pre-filled for you</span></h2>
+        <p className="muted small">Run this inside your product repo:</p>
         <CodeBlock text={mcpCmd} />
-        <p className="muted small">Claude Desktop / Code Puppy: add the same URL + Authorization header in their MCP config.</p>
+        <p className="muted small">…or drop this in as <code>.mcp.json</code> in your repo (token already baked in — no env vars needed):</p>
+        <CodeBlock text={mcpJson} />
       </section>
 
       <section className="panel">
-        <h2>2 · Stream activity via hooks <span className="muted small">live board + feed</span></h2>
+        <h2>2 · Code Puppy <span className="muted small">MCP-native — works out of the box</span></h2>
+        <p className="muted small">
+          <a href="https://github.com/mpfaffenberger/code_puppy" target="_blank" rel="noreferrer">Code Puppy</a> reads the same
+          {' '}<code>.mcp.json</code> above (token pre-filled). Then add this to your repo's <code>AGENTS.md</code> so it coordinates through the portal:
+        </p>
+        <CodeBlock text={puppyAgents} />
+      </section>
+
+      <section className="panel">
+        <h2>3 · Stream activity via hooks <span className="muted small">Claude Code — live board + feed</span></h2>
         <p className="muted small">Add to your product repo's <code>.claude/settings.json</code>, then commit + push so the team shares it.</p>
         <CodeBlock text={hooksJson} />
       </section>

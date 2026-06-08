@@ -70,6 +70,13 @@ try {
   const gLangs = (grace2?.languages ?? []).map((l) => l.name);
   check(gLangs.includes('SQL') && !gLangs.includes('TypeScript'), `Grace's languages isolated to her work: ${gLangs.join(', ')}`);
   check((grace2?.layers ?? []).some((l) => l.name === 'database'), `Grace's layers include database`);
+
+  // team awards — EVERYONE gets a positive award (nothing negative)
+  const awards = (await (await fetch(`${BASE}/api/leaderboard`, { headers: hdr(proj.token) })).json()) as Array<{ name: string; award: { title: string; emoji: string; reason: string } }>;
+  check(awards.length === 2, `awards for the whole team (got ${awards.length})`);
+  check(awards.every((a) => a.award && a.award.title.length > 0 && !!a.award.emoji), 'every member received a non-empty award');
+  const graceAward = awards.find((a) => a.name === 'Grace Hopper')?.award;
+  check(graceAward?.title === 'Data Wizard', `Grace celebrated for her database focus (got "${graceAward?.title}")`);
 } catch (err) {
   console.error('❌', err instanceof Error ? err.message : err);
   ok = false;
