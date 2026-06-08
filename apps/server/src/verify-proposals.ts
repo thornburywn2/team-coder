@@ -7,7 +7,10 @@ export {}; // module marker for top-level await
 
 const BASE = process.env.BASE_URL ?? `http://localhost:${process.env.PORT ?? 6300}`;
 const WS_URL = process.env.WS_URL ?? `ws://localhost:${process.env.PORT ?? 6300}/ws`;
+import { deleteProjectsByToken } from './test-utils';
+
 const TOKEN_A = process.env.TEAM_TOKEN ?? 'change-me-team-token';
+const cleanup: string[] = [];
 
 let ok = true;
 const check = (cond: boolean, label: string) => {
@@ -30,6 +33,7 @@ try {
   // isolated project B + its coders
   const projB = (await (await fetch(`${BASE}/api/projects`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: `Proposals ${Math.floor(performance.now())}` }) })).json()) as { token: string };
   const T = projB.token;
+  cleanup.push(T);
   const usersB = await jget<Array<{ id: string }>>(T, '/api/users');
   const [v0, v1] = usersB;
 
@@ -95,6 +99,8 @@ try {
 } catch (err) {
   console.error('❌', err instanceof Error ? err.message : err);
   ok = false;
+} finally {
+  await deleteProjectsByToken(...cleanup);
 }
 
 console.log(ok ? '\n[verify-proposals] ✅ proposals + messaging live & isolated' : '\n[verify-proposals] ❌ failed');

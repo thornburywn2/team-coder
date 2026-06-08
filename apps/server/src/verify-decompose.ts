@@ -1,6 +1,7 @@
 export {}; // module marker for top-level await
 
 import { decomposePrd } from './lib/decompose';
+import { deleteProjectsByToken } from './test-utils';
 
 // #42 acceptance check. Two parts:
 //   UNIT — the pure decomposer handles checklists, task-sections, headings, and
@@ -11,6 +12,7 @@ import { decomposePrd } from './lib/decompose';
 
 const BASE = process.env.BASE_URL ?? `http://localhost:${process.env.PORT ?? 6300}`;
 const TOKEN_A = process.env.TEAM_TOKEN ?? 'change-me-team-token';
+const cleanup: string[] = [];
 
 let ok = true;
 const check = (cond: boolean, label: string) => {
@@ -55,6 +57,7 @@ try {
   // create an isolated project B to commit into (keeps the default board clean)
   const projB = (await (await fetch(`${BASE}/api/projects`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: `Decompose ${stamp}` }) })).json()) as { token: string };
   const T = projB.token;
+  cleanup.push(T);
 
   // ingest PRD
   const saved = (await (await fetch(`${BASE}/api/projects/current/prd`, { method: 'PUT', headers: hdr(T), body: JSON.stringify({ prd }) })).json()) as { prd: string };
@@ -83,11 +86,14 @@ try {
 
   // empty-PRD decompose is rejected
   const emptyProj = (await (await fetch(`${BASE}/api/projects`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: `Empty ${stamp}` }) })).json()) as { token: string };
+  cleanup.push(emptyProj.token);
   const bad = await fetch(`${BASE}/api/projects/current/decompose`, { method: 'POST', headers: hdr(emptyProj.token), body: JSON.stringify({}) });
   check(bad.status === 400, `decompose with no PRD → 400 (got ${bad.status})`);
 } catch (err) {
   console.error('❌', err instanceof Error ? err.message : err);
   ok = false;
+} finally {
+  await deleteProjectsByToken(...cleanup);
 }
 
 console.log(ok ? '\n[verify-decompose] ✅ PRD ingestion + decomposition OK' : '\n[verify-decompose] ❌ failed');

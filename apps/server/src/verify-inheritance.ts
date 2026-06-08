@@ -6,7 +6,10 @@ export {}; // module marker for top-level await
 // Requires the server running + db:seed.
 
 const BASE = process.env.BASE_URL ?? `http://localhost:${process.env.PORT ?? 6300}`;
+import { deleteProjectsByToken } from './test-utils';
+
 const TOKEN_A = process.env.TEAM_TOKEN ?? 'change-me-team-token';
+const cleanup: string[] = [];
 
 let ok = true;
 const check = (cond: boolean, label: string) => {
@@ -30,6 +33,7 @@ try {
   const projB = await jpost<{ token: string }>(TOKEN_A, '/api/projects', { name: `Inherit ${stamp}` });
   // NOTE: project create is open; jpost with any token works (no auth on create)
   const T = projB.token;
+  cleanup.push(T);
   const users = await jget<Array<{ id: string }>>(T, '/api/users');
   const me = users[0]?.id;
 
@@ -80,6 +84,8 @@ try {
 } catch (err) {
   console.error('❌', err instanceof Error ? err.message : err);
   ok = false;
+} finally {
+  await deleteProjectsByToken(...cleanup);
 }
 
 console.log(ok ? '\n[verify-inheritance] ✅ proposal adoption auto-creates tasks' : '\n[verify-inheritance] ❌ failed');

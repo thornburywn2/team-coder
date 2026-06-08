@@ -37,6 +37,7 @@ export interface CreatedProject {
   name: string;
   token: string;
   githubRepoUrl: string | null;
+  coders?: { id: string; username: string; displayName: string | null; agentToken: string }[];
 }
 
 export interface Note {

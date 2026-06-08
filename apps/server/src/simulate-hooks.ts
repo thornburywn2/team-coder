@@ -5,10 +5,13 @@ export {}; // module marker so top-level await is allowed
 // (status/current file/scrubbed prompt) and emitted feed items. Proves the full
 // ingestion -> derivation pipeline. Requires the server to be running.
 
+import { createTestProject, deleteProject } from './test-utils';
+
 const BASE = process.env.BASE_URL ?? `http://localhost:${process.env.PORT ?? 6300}`;
-const TEAM_TOKEN = process.env.TEAM_TOKEN ?? 'change-me-team-token';
-const AGENT_TOKEN = process.env.AGENT_TOKEN ?? 'dev-token-alice'; // alice (seeded)
 const SESSION = `sim-${Math.floor(performance.now())}`;
+let TEAM_TOKEN = '';
+let AGENT_TOKEN = '';
+let projectId = '';
 
 async function hook(body: Record<string, unknown>): Promise<number> {
   const t0 = performance.now();
@@ -34,6 +37,10 @@ const check = (cond: boolean, label: string) => {
 };
 
 try {
+  const tp = await createTestProject('verify-hooks');
+  projectId = tp.id;
+  TEAM_TOKEN = tp.token;
+  AGENT_TOKEN = tp.agentToken('alice');
   // warm up the route once — a long-running server's cold first-hit (JIT/route
   // compile) doesn't represent steady-state latency, which is what matters.
   await hook({ hook_event_name: 'SessionStart' });
@@ -61,6 +68,8 @@ try {
 } catch (err) {
   console.error('❌', err instanceof Error ? err.message : err);
   ok = false;
+} finally {
+  if (projectId) await deleteProject(projectId);
 }
 
 console.log(ok ? '\n[simulate-hooks] ✅ ingestion pipeline OK' : '\n[simulate-hooks] ❌ failed');

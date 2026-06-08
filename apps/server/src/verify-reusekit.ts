@@ -7,10 +7,12 @@ export {}; // module marker for top-level await
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { deleteProjectsByToken } from './test-utils';
 
 const BASE = process.env.BASE_URL ?? `http://localhost:${process.env.PORT ?? 6300}`;
 const WS_URL = process.env.WS_URL ?? `ws://localhost:${process.env.PORT ?? 6300}/ws`;
 const TOKEN_A = process.env.TEAM_TOKEN ?? 'change-me-team-token';
+const cleanup: string[] = [];
 
 let ok = true;
 const check = (cond: boolean, label: string) => {
@@ -66,6 +68,7 @@ try {
   // adoption auto-publishes a pattern from a proposal's reference implementation
   const projB = await jpost<{ token: string }>(TOKEN_A, '/api/projects', { name: `Reuse ${stamp}` });
   const T = projB.token;
+  cleanup.push(T);
   const bUsers = await jget<Array<{ id: string }>>(T, '/api/users');
   const prop = await jpost<{ id: string }>(T, '/api/proposals', { title: `Adopt retry helper ${stamp}`, description: 'standardize retries', codeSnippet: 'export async function retry(fn){/*...*/}', language: 'ts', authorId: bUsers[0]?.id });
   const accepted = await jpost<{ adopted?: { tasks: number; pattern: boolean } }>(T, `/api/proposals/${prop.id}/status`, { status: 'accepted', actorId: bUsers[0]?.id });
@@ -94,6 +97,8 @@ try {
 } catch (err) {
   console.error('❌', err instanceof Error ? err.message : err);
   ok = false;
+} finally {
+  await deleteProjectsByToken(...cleanup);
 }
 
 console.log(ok ? '\n[verify-reusekit] ✅ reuse-kit live, adopt-publishes, isolated' : '\n[verify-reusekit] ❌ failed');

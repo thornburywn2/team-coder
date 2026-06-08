@@ -2,31 +2,36 @@ export {}; // module marker for top-level await
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { createTestProject, deleteProject } from './test-utils';
 
 // P4b acceptance check: connect to /mcp as a coder's agent (Bearer token), list
 // tools, claim a task via MCP, read it back, confirm the write landed in the DB
-// (visible to the human portal), and read a resource. Requires the server running.
+// (visible to the human portal), and read a resource. Runs in a throwaway project
+// (deleted at the end) — no debris. Requires the server running.
 
 const BASE = process.env.BASE_URL ?? `http://localhost:${process.env.PORT ?? 6300}`;
-const TEAM = process.env.TEAM_TOKEN ?? 'change-me-team-token';
-
-const teamHeaders = { 'x-team-token': TEAM, 'content-type': 'application/json' };
 const textOf = (r: { content: Array<{ text?: string }> }) => JSON.parse(r.content[0]?.text ?? 'null');
 
 let ok = true;
+let projectId = '';
+let teamHeaders: Record<string, string> = {};
 const check = (cond: boolean, label: string) => {
   console.log(`${cond ? '✅' : '❌'} ${label}`);
   if (!cond) ok = false;
 };
 
 try {
+  const tp = await createTestProject('verify-mcp');
+  projectId = tp.id;
+  teamHeaders = { 'x-team-token': tp.token, 'content-type': 'application/json' };
+
   // a task to claim, and alice's id for cross-check
   const task = (await (await fetch(`${BASE}/api/tasks`, { method: 'POST', headers: teamHeaders, body: JSON.stringify({ title: 'mcp probe task' }) })).json()) as { id: string };
   const users = (await (await fetch(`${BASE}/api/users`, { headers: teamHeaders })).json()) as Array<{ id: string; username: string }>;
   const alice = users.find((u) => u.username === 'alice')!;
 
   const transport = new StreamableHTTPClientTransport(new URL(`${BASE}/mcp`), {
-    requestInit: { headers: { authorization: 'Bearer dev-token-alice' } },
+    requestInit: { headers: { authorization: `Bearer ${tp.agentToken('alice')}` } },
   });
   const client = new Client({ name: 'verify-mcp', version: '1.0.0' });
   await client.connect(transport);
@@ -68,6 +73,8 @@ try {
 } catch (err) {
   console.error('❌', err instanceof Error ? err.message : err);
   ok = false;
+} finally {
+  if (projectId) await deleteProject(projectId);
 }
 
 console.log(ok ? '\n[verify-mcp] ✅ MCP server OK' : '\n[verify-mcp] ❌ failed');

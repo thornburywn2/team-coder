@@ -4,8 +4,11 @@ export {}; // module marker for top-level await
 // modules via /hooks, then assert auto-inferred ownership attributes each module
 // to the right coder. Requires the server running.
 
+import { createTestProject, deleteProject } from './test-utils';
+
 const BASE = process.env.BASE_URL ?? `http://localhost:${process.env.PORT ?? 6300}`;
-const TEAM_TOKEN = process.env.TEAM_TOKEN ?? 'change-me-team-token';
+let TEAM_TOKEN = '';
+let projectId = '';
 
 async function edit(agentToken: string, dev: string, file: string): Promise<void> {
   const res = await fetch(`${BASE}/hooks/event`, {
@@ -35,13 +38,19 @@ const check = (cond: boolean, label: string) => {
 };
 
 try {
+  const tp = await createTestProject('verify-ownership');
+  projectId = tp.id;
+  TEAM_TOKEN = tp.token;
+  const aliceTok = tp.agentToken('alice');
+  const bobTok = tp.agentToken('bob');
+
   // alice edits the frontend repeatedly; bob edits the backend
   await Promise.all([
-    edit('dev-token-alice', 'alice', 'apps/web/src/Login.tsx'),
-    edit('dev-token-alice', 'alice', 'apps/web/src/Board.tsx'),
-    edit('dev-token-alice', 'alice', 'apps/web/src/Feed.tsx'),
-    edit('dev-token-bob', 'bob', 'apps/server/src/routes/api.ts'),
-    edit('dev-token-bob', 'bob', 'apps/server/src/ws.ts'),
+    edit(aliceTok, 'alice', 'apps/web/src/Login.tsx'),
+    edit(aliceTok, 'alice', 'apps/web/src/Board.tsx'),
+    edit(aliceTok, 'alice', 'apps/web/src/Feed.tsx'),
+    edit(bobTok, 'bob', 'apps/server/src/routes/api.ts'),
+    edit(bobTok, 'bob', 'apps/server/src/ws.ts'),
   ]);
 
   await new Promise((r) => setTimeout(r, 300)); // let fire-and-forget ingest flush
@@ -56,6 +65,8 @@ try {
 } catch (err) {
   console.error('❌', err instanceof Error ? err.message : err);
   ok = false;
+} finally {
+  if (projectId) await deleteProject(projectId);
 }
 
 console.log(ok ? '\n[verify-ownership] ✅ auto-inference OK' : '\n[verify-ownership] ❌ failed');

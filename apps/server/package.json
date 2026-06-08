@@ -11,6 +11,7 @@
     "db:migrate": "bun run src/db/migrate.ts",
     "db:seed": "bun run src/db/seed.ts",
     "db:verify": "bun run src/db/verify-notify.ts",
+    "db:clean": "bun run src/db/clean-test-data.ts",
     "verify:ws": "bun run src/verify-ws.ts",
     "verify:hooks": "bun run src/simulate-hooks.ts",
     "verify:ownership": "bun run src/verify-ownership.ts",
@@ -24,7 +25,8 @@
     "verify:inheritance": "bun run src/verify-inheritance.ts",
     "verify:capabilities": "bun run src/verify-capabilities.ts",
     "verify:reusekit": "bun run src/verify-reusekit.ts",
-    "verify:audit": "bun run src/verify-audit.ts"
+    "verify:audit": "bun run src/verify-audit.ts",
+    "verify:all": "bun run db:verify && bun run verify:ws && bun run verify:hooks && bun run verify:ownership && bun run verify:mcp && bun run verify:gitpoll && bun run verify:report && bun run verify:isolation && bun run verify:notes && bun run verify:decompose && bun run verify:proposals && bun run verify:inheritance && bun run verify:reusekit && bun run verify:capabilities && bun run verify:audit"
   },
   "dependencies": {
     "@team-coder/shared": "workspace:*",

@@ -5,9 +5,12 @@ export {}; // module marker for top-level await
 // (c) stays isolated — a note posted to another project never reaches this
 // project's socket or list. Requires the server running + db:seed.
 
+import { deleteProjectsByToken } from './test-utils';
+
 const BASE = process.env.BASE_URL ?? `http://localhost:${process.env.PORT ?? 6300}`;
 const WS_URL = process.env.WS_URL ?? `ws://localhost:${process.env.PORT ?? 6300}/ws`;
 const TOKEN_A = process.env.TEAM_TOKEN ?? 'change-me-team-token';
+const cleanup: string[] = [];
 
 let ok = true;
 const check = (cond: boolean, label: string) => {
@@ -31,6 +34,7 @@ try {
   // Project B with its own token
   const projB = (await (await fetch(`${BASE}/api/projects`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Notes Test B' }) })).json()) as { token: string };
   const TOKEN_B = projB.token;
+  cleanup.push(TOKEN_B);
   const usersA = await jget<Array<{ id: string }>>(TOKEN_A, '/api/users');
   const usersB = await jget<Array<{ id: string }>>(TOKEN_B, '/api/users');
 
@@ -74,6 +78,8 @@ try {
 } catch (err) {
   console.error('❌', err instanceof Error ? err.message : err);
   ok = false;
+} finally {
+  await deleteProjectsByToken(...cleanup);
 }
 
 console.log(ok ? '\n[verify-notes] ✅ notes live + isolated' : '\n[verify-notes] ❌ failed');

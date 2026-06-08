@@ -39,7 +39,7 @@ publicProjectRoutes.post('/', async (c) => {
   const inserted = await db
     .insert(schema.users)
     .values(STARTER_CODERS.map((u) => ({ ...u, projectId, agentToken: `dev-${crypto.randomUUID()}` })))
-    .returning({ id: schema.users.id });
+    .returning({ id: schema.users.id, username: schema.users.username, displayName: schema.users.displayName, agentToken: schema.users.agentToken });
 
   await db
     .insert(schema.userPresence)
@@ -51,6 +51,7 @@ publicProjectRoutes.post('/', async (c) => {
     .values(STARTER_MODULES.map((m) => ({ ...m, projectId })))
     .onConflictDoNothing({ target: [schema.modules.projectId, schema.modules.pathPrefix] });
 
-  // return the token once — the creator needs it to log in and to connect agents
-  return c.json(proj, 201);
+  // return the token + per-coder agent tokens once — the creator needs them to log
+  // in and to connect each teammate's agent (also shown later in the Connect screen).
+  return c.json({ ...proj, coders: inserted }, 201);
 });

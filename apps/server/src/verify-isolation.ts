@@ -6,8 +6,12 @@ export {}; // module marker for top-level await
 // Also checks backward-compat (the default token still works) and that an unknown
 // token is rejected. Requires the server running + db:seed (Default Project).
 
+import { deleteProjectsByToken } from './test-utils';
+
 const BASE = process.env.BASE_URL ?? `http://localhost:${process.env.PORT ?? 6300}`;
-const TOKEN_A = process.env.TEAM_TOKEN ?? 'change-me-team-token'; // Default Project
+const DEFAULT_TOKEN = process.env.TEAM_TOKEN ?? 'change-me-team-token'; // for the backward-compat check only
+let TOKEN_A = ''; // throwaway Project A (so this test never writes to the real default board)
+const cleanup: string[] = []; // throwaway project tokens to delete at the end
 
 let ok = true;
 const check = (cond: boolean, label: string) => {
@@ -28,16 +32,18 @@ async function mkTask(token: string, title: string): Promise<{ id: string }> {
 }
 
 try {
-  // 1. create Project B (open endpoint, no token) → mints its own token
-  const created = await fetch(`${BASE}/api/projects`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name: 'Isolation Test B' }),
-  });
-  check(created.status === 201, `POST /api/projects -> ${created.status}`);
-  const projB = (await created.json()) as { id: string; name: string; token: string };
+  // 1. create two isolated projects (open endpoint) — A and B, both throwaway
+  const mkProject = async (name: string) => {
+    const r = await fetch(`${BASE}/api/projects`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name }) });
+    if (r.status !== 201) throw new Error(`POST /api/projects -> ${r.status}`);
+    return r.json() as Promise<{ id: string; name: string; token: string }>;
+  };
+  const projA = await mkProject('Isolation Test A');
+  const projB = await mkProject('Isolation Test B');
+  TOKEN_A = projA.token;
   const TOKEN_B = projB.token;
-  check(!!TOKEN_B && TOKEN_B !== TOKEN_A, `Project B got a distinct token`);
+  cleanup.push(TOKEN_A, TOKEN_B);
+  check(!!TOKEN_A && !!TOKEN_B && TOKEN_A !== TOKEN_B, `each project got a distinct token`);
 
   // 2. current-project header is correctly scoped per token
   const curA = await jget<{ id: string; name: string }>(TOKEN_A, '/api/projects/current');
@@ -72,12 +78,16 @@ try {
   const reportB = await jget<{ coders: Array<{ id: string }> }>(TOKEN_B, '/api/report');
   check(reportB.coders.every((c) => !idsA.has(c.id)), `B's report contains only B's coders`);
 
-  // 7. backward-compat + auth: default token works; an unknown token is 401
+  // 7. backward-compat + auth: the default token still resolves; unknown is 401
+  const def = await fetch(`${BASE}/api/users`, { headers: hdr(DEFAULT_TOKEN) });
+  check(def.ok, `default token still resolves (${def.status})`);
   const unknown = await fetch(`${BASE}/api/tasks`, { headers: hdr('definitely-not-a-real-token') });
   check(unknown.status === 401, `unknown token rejected (${unknown.status})`);
 } catch (err) {
   console.error('❌', err instanceof Error ? err.message : err);
   ok = false;
+} finally {
+  await deleteProjectsByToken(...cleanup);
 }
 
 console.log(ok ? '\n[verify-isolation] ✅ projects fully isolated' : '\n[verify-isolation] ❌ leak detected');

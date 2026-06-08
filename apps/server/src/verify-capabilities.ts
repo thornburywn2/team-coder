@@ -2,25 +2,29 @@ export {}; // module marker for top-level await
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { createTestProject, deleteProject } from './test-utils';
 
 // Capability-gap closure check (MCP). Proves the agent can now: list the whole
 // backlog (list_tasks), list teammates (list_team), read a task thread
 // (get_comments), set priority/tags/due-date on create + edit, and that a
 // progress note written via update_task_progress is READ BACK as a comment.
-// Requires the server running + db:seed.
+// Runs in its own throwaway project (deleted at the end) — no debris. Server + db:seed.
 
 const BASE = process.env.BASE_URL ?? `http://localhost:${process.env.PORT ?? 6300}`;
 const textOf = (r: { content: Array<{ text?: string }> }) => JSON.parse(r.content[0]?.text ?? 'null');
 
 let ok = true;
+let projectId = '';
 const check = (cond: boolean, label: string) => {
   console.log(`${cond ? '✅' : '❌'} ${label}`);
   if (!cond) ok = false;
 };
 
 try {
+  const tp = await createTestProject('verify-capabilities');
+  projectId = tp.id;
   const transport = new StreamableHTTPClientTransport(new URL(`${BASE}/mcp`), {
-    requestInit: { headers: { authorization: 'Bearer dev-token-alice' } },
+    requestInit: { headers: { authorization: `Bearer ${tp.agentToken('alice')}` } },
   });
   const client = new Client({ name: 'verify-capabilities', version: '1.0.0' });
   await client.connect(transport);
@@ -60,6 +64,8 @@ try {
 } catch (err) {
   console.error('❌', err instanceof Error ? err.message : err);
   ok = false;
+} finally {
+  if (projectId) await deleteProject(projectId);
 }
 
 console.log(ok ? '\n[verify-capabilities] ✅ MCP write/read gaps closed' : '\n[verify-capabilities] ❌ failed');

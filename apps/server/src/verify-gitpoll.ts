@@ -7,6 +7,7 @@ import { and, eq } from 'drizzle-orm';
 import { db, queryClient, schema } from './db';
 import { computeOwnership } from './ownership';
 import { pollGitRepo } from './git-poll';
+import { deleteProject } from './test-utils';
 
 // P10 git-poll acceptance check: build a throwaway product repo with commits by
 // a known author, run the poller, and assert commits/file-changes are ingested,
@@ -17,6 +18,7 @@ const dir = mkdtempSync(join(tmpdir(), 'tc-git-'));
 const git = (args: string[]) => Bun.spawnSync(['git', ...args], { cwd: dir });
 
 let ok = true;
+let projectId = '';
 const check = (cond: boolean, label: string) => {
   console.log(`${cond ? '✅' : '❌'} ${label}`);
   if (!cond) ok = false;
@@ -34,11 +36,12 @@ try {
   git(['add', '-A']);
   git(['commit', '-q', '-m', 'feat: extend foo']);
 
-  // resolve the default project (seeded) and ingest the throwaway repo into it
-  const DEFAULT_TOKEN = process.env.TEAM_TOKEN ?? 'change-me-team-token';
-  const [proj] = await db.select({ id: schema.projects.id }).from(schema.projects).where(eq(schema.projects.token, DEFAULT_TOKEN));
-  if (!proj) throw new Error('default project not found — run db:seed first');
-  const projectId = proj.id;
+  // create a throwaway project (with carol + the shared module) to ingest into,
+  // so this test leaves no debris on any real board. Deleted in finally.
+  const [proj] = await db.insert(schema.projects).values({ name: 'verify-gitpoll', token: `gitpoll-${crypto.randomUUID()}` }).returning({ id: schema.projects.id });
+  projectId = proj!.id;
+  await db.insert(schema.users).values({ projectId, username: 'carol', displayName: 'Carol', email: 'carol@teamcoder.dev', agentToken: `dev-${crypto.randomUUID()}` });
+  await db.insert(schema.modules).values({ projectId, name: 'shared', pathPrefix: 'packages/shared/' });
 
   const res = await pollGitRepo({ projectId, repoDir: dir }); // local repo as-is, no clone/pull
   check(res.configured && res.newCommits >= 2, `ingested >=2 commits (got ${res.newCommits})`);
@@ -67,6 +70,7 @@ try {
   ok = false;
 } finally {
   rmSync(dir, { recursive: true, force: true });
+  if (projectId) await deleteProject(projectId);
   await queryClient.end();
 }
 
