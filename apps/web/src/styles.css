@@ -85,6 +85,26 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .open-proposals .tally, .live-agents .time { margin-left: auto; flex: none; }
 .live-agents .who { font-weight: 600; }
 .live-agents .file { color: var(--accent); font-size: 0.72rem; }
+
+/* repo status widget */
+.repo-head { display: flex; align-items: center; gap: 0.45rem; margin-bottom: 0.5rem; }
+.repo-name { color: var(--accent); text-decoration: none; font-weight: 600; font-size: 0.85rem; }
+.repo-name:hover { text-decoration: underline; }
+.repo-count { margin-left: auto; flex: none; }
+.repo-latest { border-top: 1px solid var(--border); padding-top: 0.5rem; }
+.repo-sha { color: var(--accent); background: rgba(91,140,255,0.12); padding: 0.05rem 0.35rem; border-radius: 4px; font-size: 0.72rem; }
+.repo-msg { margin-left: 0.4rem; font-size: 0.82rem; word-break: break-word; }
+.repo-synced { color: var(--green); }
+
+/* burndown chart */
+.burndown .bd-head { margin-left: auto; font-size: 0.7rem; font-weight: 400; color: var(--muted); }
+.bd-svg { width: 100%; height: 150px; display: block; }
+.bd-axis { display: flex; justify-content: space-between; margin-top: 0.1rem; }
+.bd-legend { display: flex; gap: 1rem; margin-top: 0.35rem; }
+.bd-legend span { display: inline-flex; align-items: center; gap: 0.3rem; }
+.bd-key { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.bd-key.bd-scope { background: var(--muted); }
+.bd-key.bd-done { background: var(--green); }
 header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
 header h1 { margin: 0; font-size: 1.25rem; }
 .conn { font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 999px; }

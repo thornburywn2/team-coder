@@ -312,6 +312,21 @@ export function getSummary() {
   return api<Summary>('/summary');
 }
 
+export interface RepoStatus {
+  repoUrl: string | null;
+  commitCount: number;
+  latest: { sha: string; committedAt: string | null; authorName: string | null; message: string | null } | null;
+}
+export function getRepoStatus() {
+  return api<RepoStatus>('/repo/status');
+}
+
+export interface BurndownPoint { date: string; scope: number; done: number; remaining: number }
+export interface Burndown { series: BurndownPoint[]; total: number; done: number }
+export function getBurndown() {
+  return api<Burndown>('/burndown');
+}
+
 export interface CollisionWarning {
   file: string;
   developers: { id: string; name: string }[];

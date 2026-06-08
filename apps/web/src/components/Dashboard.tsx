@@ -16,6 +16,8 @@ import { Tasks } from './Tasks';
 import { Blockers } from './Blockers';
 import { LiveAgents } from './LiveAgents';
 import { OpenProposals } from './OpenProposals';
+import { RepoStatus } from './RepoStatus';
+import { Burndown } from './Burndown';
 import { Report } from './Report';
 import { Proposals } from './Proposals';
 import { Patterns } from './Patterns';
@@ -56,12 +58,18 @@ export function Dashboard() {
         case 'TASK_DELETED':
           void queryClient.invalidateQueries({ queryKey: ['tasks'] });
           void queryClient.invalidateQueries({ queryKey: ['summary'] });
+          void queryClient.invalidateQueries({ queryKey: ['burndown'] });
           break;
         case 'NOTE_ADDED':
           void queryClient.invalidateQueries({ queryKey: ['notes'] });
           break;
         case 'PATTERN_ADDED':
           void queryClient.invalidateQueries({ queryKey: ['patterns'] });
+          break;
+        case 'REPO_UPDATED':
+          void queryClient.invalidateQueries({ queryKey: ['repo-status'] });
+          void queryClient.invalidateQueries({ queryKey: ['summary'] });
+          void queryClient.invalidateQueries({ queryKey: ['report'] });
           break;
         case 'PROPOSAL_UPDATED':
         case 'VOTE_CAST':
@@ -113,6 +121,8 @@ export function Dashboard() {
               <Blockers />
               <OpenProposals onOpen={() => setView('proposals')} />
             </div>
+            <div className="w8"><Burndown /></div>
+            <div className="w4"><RepoStatus /></div>
             <div className="w6"><Notes /></div>
             <div className="w6"><Feed /></div>
             <div className="w12"><Ownership /></div>

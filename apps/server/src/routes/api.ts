@@ -99,6 +99,28 @@ apiRoutes.get('/summary', async (c) => {
   });
 });
 
+// burndown — daily cumulative scope vs done (and remaining) over the project, so
+// the team sees momentum toward the goal. Approximate completion time = updatedAt
+// of done tasks; scope grows as tasks are added.
+apiRoutes.get('/burndown', async (c) => {
+  const pid = c.get('project').id;
+  const rows = await db.select({ createdAt: schema.tasks.createdAt, updatedAt: schema.tasks.updatedAt, status: schema.tasks.status }).from(schema.tasks).where(eq(schema.tasks.projectId, pid));
+  if (!rows.length) return c.json({ series: [], total: 0, done: 0 });
+  const day = (d: Date | string) => new Date(d).toISOString().slice(0, 10);
+  const created = rows.map((r) => day(r.createdAt));
+  const doneDays = rows.filter((r) => r.status === 'done').map((r) => day(r.updatedAt));
+  const start = created.reduce((a, b) => (a < b ? a : b));
+  const end = day(new Date());
+  const days: string[] = [];
+  for (let d = new Date(`${start}T00:00:00Z`); day(d) <= end && days.length < 60; d = new Date(d.getTime() + 86_400_000)) days.push(day(d));
+  const series = days.map((date) => {
+    const scope = created.filter((x) => x <= date).length;
+    const done = doneDays.filter((x) => x <= date).length;
+    return { date, scope, done, remaining: scope - done };
+  });
+  return c.json({ series, total: rows.length, done: doneDays.length });
+});
+
 // live activity feed (durable, most-recent-first), this project only
 apiRoutes.get('/feed', async (c) => c.json(await recentFeed(c.get('project').id)));
 
