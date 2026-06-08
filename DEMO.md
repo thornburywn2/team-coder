@@ -7,6 +7,12 @@ while the agents pull live context over MCP.
 
 > Setup for the demo: have the portal open on the projector, and 2–3 people ready
 > to connect an agent ([GETTING-STARTED.md](./GETTING-STARTED.md)).
+>
+> **Want a pre-loaded board to show first?** Run `bun run demo:seed` (in
+> `apps/server`) to populate the Default Project with a realistic ~3-day project —
+> tasks in every state, proposals/votes, adopted proposals, the reuse kit, agents
+> (live + idle), team awards, and a git-based report. Log in with the team token
+> `change-me-team-token`. Re-runnable (it resets the Default Project first).
 
 ---
 

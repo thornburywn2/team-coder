@@ -12,6 +12,7 @@
     "db:seed": "bun run src/db/seed.ts",
     "db:verify": "bun run src/db/verify-notify.ts",
     "db:clean": "bun run src/db/clean-test-data.ts",
+    "demo:seed": "bun run src/db/demo-seed.ts",
     "verify:ws": "bun run src/verify-ws.ts",
     "verify:hooks": "bun run src/simulate-hooks.ts",
     "verify:ownership": "bun run src/verify-ownership.ts",
