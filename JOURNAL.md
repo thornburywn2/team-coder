@@ -4,6 +4,29 @@
 
 ---
 
+## 2026-06-08 (b) — Optional polish complete
+
+**Scope:** apps/server (mcp, api, schema, decompose)
+**Outcome:** SUCCESS — the optional backlog is now also done.
+
+Shipped the three low-priority items: (1) `search_tasks` filters (assignee/tag/
+module) + limit/offset pagination returning `{tasks,total,limit,offset}`;
+(2) idempotency keys on `post_decision` + `add_shared_pattern` (migration 0007,
+nullable key + unique `(project_id,key)`; retry returns the existing row,
+`deduped:true`); (3) opt-in LLM-assisted decomposition (`DECOMPOSE_LLM=1`, any
+OpenAI-compatible endpoint) with the deterministic parser as default + guaranteed
+fallback — `POST /decompose` reports `mode`.
+
+Verified `verify:polish` (10 checks) + confirmed LLM-enabled-but-unreachable falls
+back to deterministic in ~17ms (no hang). 17 verify scripts green. **Nothing left
+in scope** — only the operational work (deploy at work, onboard the team) remains.
+
+**Lesson:** Postgres treats NULLs as distinct in a unique index, so a nullable
+idempotency key needs no partial index — unkeyed rows coexist freely while keyed
+ones dedupe.
+
+---
+
 ## 2026-06-08 — Multi-project, #36/#42, audit fixes, debris cleanup, containerize, #37/#39, deploy rehearsal
 
 **Scope:** apps/server, apps/web, packages/shared, agent-kit, Docker/compose
