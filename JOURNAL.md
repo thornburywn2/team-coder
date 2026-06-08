@@ -4,6 +4,37 @@
 
 ---
 
+## 2026-06-08 (c) — Pre-deploy: report analysis, agents, UX fixes, onboarding docs
+
+**Scope:** apps/server (report, agents, projects, hooks), apps/web, agent-kit, docs
+**Outcome:** SUCCESS
+
+Round of pre-deploy work driven by demo prep + field feedback:
+- **Report language + stack analysis:** `lib/classify.ts` maps file paths → language
+  (by extension) and layer (frontend/backend/database/infra/docs); report adds
+  Languages + "Where in the stack" breakdowns (git LOC if available, else live hook
+  edits, `analysisBasis` reported) + markdown export.
+- **Agents view + `GET /api/agents`:** each running session = an agent, grouped per
+  coder (a coder can run several at once), with per-agent stats. Fixed a real bug —
+  a session's first event wasn't counted in prompt/tool totals.
+- **Members at creation:** project creation takes the typed roster (`members[]`)
+  instead of hardcoded Alice/Bob (slugified usernames, palette colors, random
+  tokens; created screen lists each member's token). SSO later.
+- **Clipboard FIX:** copy buttons failed on plain-HTTP/LAN because
+  `navigator.clipboard` is secure-context-only; added `lib/clipboard.ts` with an
+  `execCommand` fallback (Connect, Patterns, created-project tokens).
+- **Docs:** GETTING-STARTED.md (2-min onboard against a deployed appliance, pull
+  just `agent-kit/mcp.json` — no clone), DEMO.md walkthrough, agent-kit links.
+
+`verify:extras` (custom members + agents + edit-basis language/layer) + report git-
+basis assertions; all 18 verify scripts green.
+
+**Lesson:** Secure-context-only browser APIs (clipboard) silently no-op on LAN HTTP
+— always provide a fallback for self-hosted/LAN apps. And test the *first* event of
+a counter, not just the increment path.
+
+---
+
 ## 2026-06-08 (b) — Optional polish complete
 
 **Scope:** apps/server (mcp, api, schema, decompose)
