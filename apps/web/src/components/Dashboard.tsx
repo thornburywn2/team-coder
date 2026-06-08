@@ -15,7 +15,8 @@ import { Notes } from './Notes';
 import { Tasks } from './Tasks';
 import { Blockers } from './Blockers';
 import { LiveAgents } from './LiveAgents';
-import { OpenProposals } from './OpenProposals';
+import { ProposalsWidget } from './ProposalsWidget';
+import { Awards } from './Awards';
 import { RepoStatus } from './RepoStatus';
 import { Burndown } from './Burndown';
 import { MyWork } from './MyWork';
@@ -23,13 +24,12 @@ import { StaleTasks } from './StaleTasks';
 import { Report } from './Report';
 import { Proposals } from './Proposals';
 import { Patterns } from './Patterns';
-import { Agents } from './Agents';
 import { Connect } from './Connect';
 
 export function Dashboard() {
   const { token, connected, setConnected, hydratePresence, applyPresence, hydrateFeed, pushFeed, setOwnership, hydrateCollisions, pushCollision, logout } =
     useStore();
-  const [view, setView] = useState<'board' | 'proposals' | 'patterns' | 'agents' | 'report' | 'connect'>('board');
+  const [view, setView] = useState<'board' | 'proposals' | 'patterns' | 'report' | 'connect'>('board');
   const { data: project } = useQuery({ queryKey: ['project'], queryFn: () => api<ProjectInfo>('/projects/current') });
 
   useEffect(() => {
@@ -102,7 +102,6 @@ export function Dashboard() {
           <button className={view === 'board' ? 'active' : ''} onClick={() => setView('board')}>Board</button>
           <button className={view === 'proposals' ? 'active' : ''} onClick={() => setView('proposals')}>Proposals</button>
           <button className={view === 'patterns' ? 'active' : ''} onClick={() => setView('patterns')}>Reuse kit</button>
-          <button className={view === 'agents' ? 'active' : ''} onClick={() => setView('agents')}>Agents</button>
           <button className={view === 'report' ? 'active' : ''} onClick={() => setView('report')}>Report</button>
           <button className={view === 'connect' ? 'active' : ''} onClick={() => setView('connect')}>Connect agent</button>
         </nav>
@@ -116,32 +115,35 @@ export function Dashboard() {
             <Kpis />
           </div>
           <div className="board-grid">
+            {/* Elevated: the most important work + what needs the engineer's attention */}
+            <div className="w12 section-label" title="The important items, elevated: your priority work, what's blocked, and what's gone quiet">⭐ Needs your attention</div>
+            <div className="w4"><MyWork /></div>
+            <div className="w4"><Blockers /></div>
+            <div className="w4"><StaleTasks /></div>
+
+            {/* The work: who's on what, the full backlog, decisions, context */}
+            <div className="w12 section-label" title="Live team activity, the full backlog, and decisions in flight">📋 The work</div>
             <div className="w8"><Board /></div>
-            <div className="w4 col-stack">
-              <MyWork />
-              <LiveAgents />
-            </div>
+            <div className="w4"><LiveAgents /></div>
             <div className="w8"><Tasks /></div>
             <div className="w4 col-stack">
-              <Blockers />
-              <StaleTasks />
-            </div>
-            <div className="w8"><Burndown /></div>
-            <div className="w4 col-stack">
-              <OpenProposals onOpen={() => setView('proposals')} />
+              <Ownership />
               <RepoStatus />
             </div>
+            <div className="w6"><ProposalsWidget onOpenTab={() => setView('proposals')} /></div>
             <div className="w6"><Notes /></div>
             <div className="w6"><Feed /></div>
-            <div className="w12"><Ownership /></div>
+            <div className="w6"><Awards /></div>
+
+            {/* Trends: larger charts live at the bottom */}
+            <div className="w12 section-label" title="Progress over time — larger charts live here">📈 Trends</div>
+            <div className="w12"><Burndown /></div>
           </div>
         </div>
       ) : view === 'proposals' ? (
         <Proposals />
       ) : view === 'patterns' ? (
         <Patterns />
-      ) : view === 'agents' ? (
-        <Agents />
       ) : view === 'report' ? (
         <Report />
       ) : (

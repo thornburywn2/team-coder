@@ -36,6 +36,16 @@ export function Burndown() {
                 <path d={areaPath} fill="var(--green)" opacity="0.14" />
                 <polyline points={line(series, (p) => p.scope, maxY)} fill="none" stroke="var(--muted)" strokeWidth="1.5" strokeDasharray="4 3" />
                 <polyline points={donePts} fill="none" stroke="var(--green)" strokeWidth="2" />
+                {series.map((p, i) => {
+                  const n = series.length;
+                  const x = PADL + (n === 1 ? PW : (i / (n - 1)) * PW);
+                  const y = PADT + (1 - p.done / maxY) * PH;
+                  return (
+                    <circle key={p.date} cx={x} cy={y} r="6" fill="transparent">
+                      <title>{`${p.date}\nscope: ${p.scope} · done: ${p.done} · remaining: ${p.remaining}`}</title>
+                    </circle>
+                  );
+                })}
               </svg>
               <div className="bd-axis small muted"><span>{shortDate(series[0]!.date)}</span><span>{shortDate(series[series.length - 1]!.date)}</span></div>
               <div className="bd-legend small muted">

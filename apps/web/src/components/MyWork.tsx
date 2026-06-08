@@ -32,7 +32,7 @@ export function MyWork() {
       ) : (
         <ul>
           {mine.map((t) => (
-            <li key={t.id} className={`task-${t.status}`}>
+            <li key={t.id} className={`task-${t.status}`} title={`${t.description || t.title}\nstatus: ${t.status.replace('_', ' ')} · priority: ${t.priority}${t.tags?.length ? `\ntags: ${t.tags.join(', ')}` : ''}`}>
               <span className={`badge ${t.status}`}>{t.status.replace('_', ' ')}</span>
               {t.priority !== 'medium' && <span className={`prio prio-${t.priority}`}>{t.priority}</span>}
               <span className="task-title">{t.title}</span>

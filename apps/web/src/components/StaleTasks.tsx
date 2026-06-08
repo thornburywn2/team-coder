@@ -30,7 +30,7 @@ export function StaleTasks() {
           {stale.map((t) => {
             const u = t.assigneeId ? byId[t.assigneeId] : undefined;
             return (
-              <li key={t.id}>
+              <li key={t.id} title={`${t.description || t.title}\n${t.status.replace('_', ' ')} · ${u ? (u.displayName ?? u.username) : 'unassigned'}\nno update in ${ageDays(t.updatedAt)} day(s) — last ${new Date(t.updatedAt).toLocaleString()}`}>
                 <span className={`badge ${t.status}`}>{t.status.replace('_', ' ')}</span>
                 <span className="task-title">{t.title}</span>
                 {u && <span className="owner"><span className="dot sm" style={{ background: u.color ?? '#888' }} />{u.displayName ?? u.username}</span>}

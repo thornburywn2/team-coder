@@ -53,9 +53,16 @@ export function Tasks() {
         {tasks.map((t) => {
           const owner = t.assigneeId ? userById[t.assigneeId] : undefined;
           const open = openThread === t.id;
+          const tip = [
+            t.description || t.title,
+            `status: ${t.status.replace('_', ' ')} · priority: ${t.priority} · source: ${t.source}`,
+            owner ? `assignee: ${owner.displayName ?? owner.username}` : 'unassigned',
+            t.tags?.length ? `tags: ${t.tags.join(', ')}` : '',
+            `updated ${new Date(t.updatedAt).toLocaleString()}`,
+          ].filter(Boolean).join('\n');
           return (
             <li key={t.id} className={`task task-${t.status}`}>
-              <div className="task-row">
+              <div className="task-row" title={tip}>
                 <span className={`badge ${t.status}`}>{t.status.replace('_', ' ')}</span>
                 {t.source === 'prd' && <span className="goal-tag" title="from the project goal (PRD)">🎯</span>}
                 {t.source === 'proposal' && <span className="goal-tag" title="from an adopted proposal">💡</span>}

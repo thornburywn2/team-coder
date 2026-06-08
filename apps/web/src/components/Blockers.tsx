@@ -20,7 +20,7 @@ export function Blockers() {
           {blocked.map((t) => {
             const u = t.assigneeId ? byId[t.assigneeId] : undefined;
             return (
-              <li key={t.id}>
+              <li key={t.id} title={`${t.description || t.title}\nblocked · ${u ? (u.displayName ?? u.username) : 'unassigned'}\nopen the task thread for the blocker reason`}>
                 <span className="task-title">{t.title}</span>
                 {u && <span className="owner"><span className="dot sm" style={{ background: u.color ?? '#888' }} />{u.displayName ?? u.username}</span>}
               </li>

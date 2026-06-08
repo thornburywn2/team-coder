@@ -61,8 +61,18 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .board-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 1rem; align-items: start; }
 .board-grid > div { min-width: 0; }
 .col-stack { display: flex; flex-direction: column; gap: 1rem; }
-.w12 { grid-column: span 12; } .w8 { grid-column: span 8; } .w6 { grid-column: span 6; } .w4 { grid-column: span 4; }
-@media (max-width: 1200px) { .w12, .w8, .w6, .w4 { grid-column: span 12; } }
+.w12 { grid-column: span 12; } .w8 { grid-column: span 8; } .w6 { grid-column: span 6; } .w4 { grid-column: span 4; } .w3 { grid-column: span 3; }
+@media (max-width: 1200px) { .w12, .w8, .w6, .w4, .w3 { grid-column: span 12; } }
+@media (min-width: 1201px) and (max-width: 1500px) { .w3 { grid-column: span 6; } }
+
+/* section dividers — clear hierarchy: important up top, charts at the bottom */
+.section-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 700; padding: 0.35rem 0 0; border-bottom: 1px solid var(--border); margin-top: 0.25rem; cursor: help; }
+
+/* uniform widget heights so nothing towers; each card scrolls its own content */
+.board-grid .panel:not(.burndown) { display: flex; flex-direction: column; max-height: 460px; }
+.board-grid .panel:not(.burndown) > ul,
+.board-grid .panel .lanes,
+.board-grid .panel .pw-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 
 /* KPI strip */
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 0.75rem; }
@@ -86,6 +96,15 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .my-work .link-btn { padding: 0 !important; flex: none; }
 .stale-tasks { border-color: rgba(245,166,35,0.35); }
 .stale-tasks .time { flex: none; color: var(--amber); }
+
+/* interactive proposals widget (inline vote + discuss) */
+.pw-list { list-style: none; margin: 0; padding: 0; }
+.pw-row { padding: 0.5rem 0; border-top: 1px solid var(--border); }
+.pw-line { display: flex; align-items: baseline; gap: 0.4rem; }
+.pw-title { flex: 1; font-weight: 600; font-size: 0.85rem; word-break: break-word; }
+.pw-author { flex: none; }
+.pw-actions { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.4rem; flex-wrap: wrap; }
+.pw-discuss { margin-left: auto; }
 .open-proposals li { cursor: pointer; }
 .open-proposals li:hover .prop-title { color: var(--accent); }
 .open-proposals .tally, .live-agents .time { margin-left: auto; flex: none; }
