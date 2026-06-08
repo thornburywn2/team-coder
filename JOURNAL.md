@@ -4,6 +4,24 @@
 
 ---
 
+## 2026-06-08 (f) — Demo data loader (fully-loaded 3-day project)
+
+**Scope:** apps/server/src/db/demo-seed.ts, DEMO.md
+**Outcome:** SUCCESS
+
+Added `bun run demo:seed` — populates the Default Project with a realistic ~3-day
+project so the whole portal is fully loaded for a demo: 5 coders with distinct
+strengths, 36 tasks across every state/source/priority, 5 proposals (votes +
+threads, 2 adopted → ADRs + reuse-kit patterns + tasks), 6 patterns, 6 ADRs,
+notes, 55 git commits/file-changes over 3 days (git-basis report: languages, stack
+layers, **daily** timeline), 350 hook events, agent sessions (live + idle),
+live ownership/presence, team awards (one each: Master Builder / Heavy Lifter /
+The Closer / The Mentor / The Architect), and a 50+ item feed incl. an idle alert.
+Re-runnable (resets the Default Project first). Verified every endpoint renders
+rich data. Log in with `change-me-team-token`.
+
+---
+
 ## 2026-06-08 (e) — Team awards, idle alerts, Connect token-prefill + Code Puppy
 
 **Scope:** apps/server (awards, idle, leaderboard), apps/web (Agents, Connect), docs
