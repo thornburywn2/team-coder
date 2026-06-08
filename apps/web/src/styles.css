@@ -114,6 +114,18 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .tu-bar { flex: 1; height: 10px; background: var(--panel-2); border-radius: 999px; overflow: hidden; }
 .tu-bar div { height: 100%; border-radius: 999px; }
 .tu-val { width: 52px; text-align: right; flex: none; color: var(--muted); }
+.tu-cost { width: 56px; text-align: right; flex: none; }
+.tu-models { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.5rem; }
+.tu-model { background: var(--panel-2); border-radius: 6px; padding: 0.1rem 0.4rem; }
+
+/* attribution panel */
+.attribution .attr-unmapped { list-style: none; margin: 0.4rem 0; padding: 0; }
+.attribution .attr-unmapped li { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; padding: 0.4rem 0; border-top: 1px solid var(--border); }
+.attribution .attr-author { flex: 1; min-width: 220px; }
+.attribution .attr-actions { display: flex; align-items: center; gap: 0.4rem; }
+.attribution .attr-actions select { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.2rem 0.4rem; }
+.attribution .attr-coders { margin-top: 0.6rem; border-top: 1px solid var(--border); padding-top: 0.5rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.attribution .attr-coder { display: flex; align-items: center; gap: 0.35rem; }
 
 /* work-locks widget */
 .locks ul { list-style: none; margin: 0; padding: 0; }

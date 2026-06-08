@@ -137,6 +137,7 @@ export interface CoderStat {
   toolCalls: number;
   tokensIn: number;
   tokensOut: number;
+  estimatedCostUsd: number;
   activeMinutes: number;
   tasksCompleted: number;
   decisions: number;
@@ -169,7 +170,7 @@ export interface Report {
   languages: Breakdown[];
   layers: Breakdown[];
   analysisBasis: 'lines' | 'edits';
-  totals: { commits: number; linesAdded: number; tasksCompleted: number; activeMinutes: number; tokensIn: number; tokensOut: number };
+  totals: { commits: number; linesAdded: number; tasksCompleted: number; activeMinutes: number; tokensIn: number; tokensOut: number; estimatedCostUsd: number };
 }
 
 export interface Agent {
@@ -325,11 +326,24 @@ export function getRepoStatus() {
 }
 
 export interface Usage {
-  coders: { developerId: string; name: string; color: string | null; tokensIn: number; tokensOut: number; total: number }[];
+  coders: { developerId: string; name: string; color: string | null; tokensIn: number; tokensOut: number; total: number; costUsd: number }[];
+  models: { model: string; tokensIn: number; tokensOut: number; total: number; costUsd: number }[];
   total: number;
+  totalCostUsd: number;
 }
 export function getUsage() {
   return api<Usage>('/usage');
+}
+
+export interface Attribution {
+  coders: { id: string; name: string; username: string; email: string | null; gitEmails: string[]; color: string | null }[];
+  unattributed: { authorEmail: string; authorName: string | null; commits: number }[];
+}
+export function getAttribution() {
+  return api<Attribution>('/attribution');
+}
+export function mapAttribution(developerId: string, email: string) {
+  return api<{ ok: boolean; backfilled: number }>('/attribution/map', { method: 'POST', body: JSON.stringify({ developerId, email }) });
 }
 
 export interface BurndownPoint { date: string; scope: number; done: number; remaining: number }

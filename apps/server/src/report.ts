@@ -2,6 +2,7 @@ import { and, count, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { db, schema } from './db';
 import { computeOwnership } from './ownership';
 import { languageOf, layerOf } from './lib/classify';
+import { estimateCost } from './lib/pricing';
 
 // Contribution report — aggregates every signal we capture (git LOC, hook edits,
 // sessions, tasks, decisions, patterns) into a per-coder breakdown with multiple
@@ -21,6 +22,7 @@ export interface CoderStat {
   toolCalls: number;
   tokensIn: number;
   tokensOut: number;
+  estimatedCostUsd: number;
   activeMinutes: number;
   tasksCompleted: number;
   decisions: number;
@@ -58,13 +60,13 @@ export interface Report {
   languages: Breakdown[]; // what the team writes in
   layers: Breakdown[]; // where in the stack: frontend/backend/database/infra/docs
   analysisBasis: 'lines' | 'edits'; // git LOC if available, else live hook edits
-  totals: { commits: number; linesAdded: number; tasksCompleted: number; activeMinutes: number; tokensIn: number; tokensOut: number };
+  totals: { commits: number; linesAdded: number; tasksCompleted: number; activeMinutes: number; tokensIn: number; tokensOut: number; estimatedCostUsd: number };
 }
 
 const num = (v: unknown): number => Number(v ?? 0);
 
 export async function buildReport(projectId: string, generatedAt: string): Promise<Report> {
-  const [users, gitAgg, filesAgg, modLinesAgg, editAgg, sessAgg, taskAgg, adrAgg, patAgg, timelineAgg, ownership, extra1, extra2] =
+  const [users, gitAgg, filesAgg, modLinesAgg, editAgg, sessAgg, taskAgg, adrAgg, patAgg, timelineAgg, ownership, extra1, extra2, extra3] =
     await Promise.all([
       db.select({ id: schema.users.id, name: schema.users.displayName, username: schema.users.username, color: schema.users.color }).from(schema.users).where(eq(schema.users.projectId, projectId)),
       db
@@ -99,8 +101,19 @@ export async function buildReport(projectId: string, generatedAt: string): Promi
       db
         .select({ dev: schema.hookEvents.developerId, filePath: schema.hookEvents.filePath, n: count() })
         .from(schema.hookEvents).where(and(eq(schema.hookEvents.projectId, projectId), isNotNull(schema.hookEvents.filePath))).groupBy(schema.hookEvents.developerId, schema.hookEvents.filePath),
+      // raw sessions for per-model + cost (cost depends on each session's model)
+      db
+        .select({ dev: schema.sessions.developerId, inputTokens: schema.sessions.inputTokens, outputTokens: schema.sessions.outputTokens, cacheReadTokens: schema.sessions.cacheReadTokens, model: schema.sessions.model })
+        .from(schema.sessions).where(and(eq(schema.sessions.projectId, projectId), isNotNull(schema.sessions.developerId))),
     ]);
-  const [gitFilesAgg, hookFilesAgg] = [extra1, extra2];
+  const [gitFilesAgg, hookFilesAgg, sessRaw] = [extra1, extra2, extra3];
+
+  // per-developer estimated cost (USD), summed across each session at its model rate
+  const costByDev = new Map<string, number>();
+  for (const s of sessRaw) {
+    if (!s.dev) continue;
+    costByDev.set(s.dev, (costByDev.get(s.dev) ?? 0) + estimateCost({ inputTokens: Number(s.inputTokens), outputTokens: Number(s.outputTokens), cacheReadTokens: Number(s.cacheReadTokens), model: s.model }));
+  }
 
   const byDev = <T extends { dev: string | null }>(rows: T[]) => new Map(rows.filter((r) => r.dev).map((r) => [r.dev as string, r]));
   const git = byDev(gitAgg);
@@ -142,6 +155,7 @@ export async function buildReport(projectId: string, generatedAt: string): Promi
     toolCalls: num(sess.get(u.id)?.tools),
     tokensIn: num(sess.get(u.id)?.tokensIn),
     tokensOut: num(sess.get(u.id)?.tokensOut),
+    estimatedCostUsd: Math.round((costByDev.get(u.id) ?? 0) * 100) / 100,
     activeMinutes: Math.round(num(sess.get(u.id)?.minutes)),
     tasksCompleted: num(tasksDone.get(u.id)?.n),
     decisions: num(adrs.get(u.id)?.n),
@@ -215,6 +229,6 @@ export async function buildReport(projectId: string, generatedAt: string): Promi
     languages: breakdown(teamRows, languageOf),
     layers: breakdown(teamRows, layerOf),
     analysisBasis,
-    totals: { commits: totCommits, linesAdded: totLines, tasksCompleted: totTasks, activeMinutes: sum((c) => c.activeMinutes), tokensIn: sum((c) => c.tokensIn), tokensOut: sum((c) => c.tokensOut) },
+    totals: { commits: totCommits, linesAdded: totLines, tasksCompleted: totTasks, activeMinutes: sum((c) => c.activeMinutes), tokensIn: sum((c) => c.tokensIn), tokensOut: sum((c) => c.tokensOut), estimatedCostUsd: Math.round(sum((c) => c.estimatedCostUsd) * 100) / 100 },
   };
 }

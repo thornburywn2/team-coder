@@ -474,15 +474,30 @@ export function createMcpServer(dev: Developer): McpServer {
   server.registerTool(
     'report_usage',
     {
-      description: 'Report your token usage for this work so the team can track + minimize spend. Call periodically (e.g. per task or session) with cumulative or incremental input/output tokens.',
-      inputSchema: { input_tokens: z.number().int().nonnegative(), output_tokens: z.number().int().nonnegative(), session_id: z.string().optional() },
+      description: 'Report your token usage so the team can track + minimize spend. Pass input/output (and optionally cache + model) tokens. mode "add" (default) increments; mode "set" overwrites this session\'s totals (use "set" with a cumulative count to stay idempotent).',
+      inputSchema: {
+        input_tokens: z.number().int().nonnegative(),
+        output_tokens: z.number().int().nonnegative(),
+        cache_read_tokens: z.number().int().nonnegative().optional(),
+        cache_creation_tokens: z.number().int().nonnegative().optional(),
+        model: z.string().optional(),
+        session_id: z.string().optional(),
+        mode: z.enum(['add', 'set']).optional(),
+      },
     },
-    async ({ input_tokens, output_tokens, session_id }) => {
+    async ({ input_tokens, output_tokens, cache_read_tokens = 0, cache_creation_tokens = 0, model, session_id, mode }) => {
       const sid = session_id?.trim() || `usage-${dev.id}`;
+      const m = model?.trim() || null;
+      const set = mode === 'set';
       await db
         .insert(schema.sessions)
-        .values({ sessionId: sid, projectId: pid, developerId: dev.id, project: null, inputTokens: input_tokens, outputTokens: output_tokens })
-        .onConflictDoUpdate({ target: schema.sessions.sessionId, set: { lastSeenAt: new Date(), inputTokens: sql`${schema.sessions.inputTokens} + ${input_tokens}`, outputTokens: sql`${schema.sessions.outputTokens} + ${output_tokens}` } });
+        .values({ sessionId: sid, projectId: pid, developerId: dev.id, project: null, inputTokens: input_tokens, outputTokens: output_tokens, cacheReadTokens: cache_read_tokens, cacheCreationTokens: cache_creation_tokens, model: m })
+        .onConflictDoUpdate({
+          target: schema.sessions.sessionId,
+          set: set
+            ? { lastSeenAt: new Date(), inputTokens: input_tokens, outputTokens: output_tokens, cacheReadTokens: cache_read_tokens, cacheCreationTokens: cache_creation_tokens, model: m ?? sql`${schema.sessions.model}` }
+            : { lastSeenAt: new Date(), inputTokens: sql`${schema.sessions.inputTokens} + ${input_tokens}`, outputTokens: sql`${schema.sessions.outputTokens} + ${output_tokens}`, cacheReadTokens: sql`${schema.sessions.cacheReadTokens} + ${cache_read_tokens}`, cacheCreationTokens: sql`${schema.sessions.cacheCreationTokens} + ${cache_creation_tokens}`, model: m ?? sql`${schema.sessions.model}` },
+        });
       return text({ ok: true });
     },
   );

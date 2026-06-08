@@ -54,12 +54,19 @@ export async function pollGitRepo(opts: {
       return { projectId, configured: true, newCommits: 0 };
     }
   } else if (repoUrl) {
-    git(repoDir, ['pull', '--quiet', '--ff-only']);
+    const pull = git(repoDir, ['pull', '--quiet', '--ff-only']);
+    if (!pull.ok) {
+      // non-fast-forward (force-push / rebase upstream). This is our READ-ONLY
+      // mirror, never an engineer's working copy, so hard-reset it to match.
+      git(repoDir, ['fetch', '--quiet', 'origin']);
+      const reset = git(repoDir, ['reset', '--hard', '@{u}']);
+      if (reset.ok) console.warn(`[git-poll] non-ff upstream for ${projectId}; reset mirror to match`);
+    }
   }
 
   const [users, mods, existing] = await Promise.all([
     db
-      .select({ id: schema.users.id, email: schema.users.email, username: schema.users.username, displayName: schema.users.displayName })
+      .select({ id: schema.users.id, email: schema.users.email, gitEmails: schema.users.gitEmails, username: schema.users.username, displayName: schema.users.displayName })
       .from(schema.users)
       .where(eq(schema.users.projectId, projectId)),
     db.select().from(schema.modules).where(eq(schema.modules.projectId, projectId)),
@@ -67,7 +74,11 @@ export async function pollGitRepo(opts: {
   ]);
 
   const seen = new Set(existing.map((e) => e.sha));
-  const byEmail = new Map(users.filter((u) => u.email).map((u) => [u.email!.toLowerCase(), u.id]));
+  const byEmail = new Map<string, string>();
+  for (const u of users) {
+    if (u.email) byEmail.set(u.email.toLowerCase(), u.id);
+    for (const ge of u.gitEmails ?? []) if (ge) byEmail.set(ge.toLowerCase(), u.id); // extra git emails
+  }
   const byName = new Map(users.map((u) => [(u.displayName ?? u.username).toLowerCase(), u.id]));
   const byUser = new Map(users.map((u) => [u.username.toLowerCase(), u.id]));
   const sortedMods = [...mods].sort((a, b) => b.pathPrefix.length - a.pathPrefix.length);
@@ -78,7 +89,8 @@ export async function pollGitRepo(opts: {
     byEmail.get(email.toLowerCase()) ?? byName.get(name.toLowerCase()) ?? byUser.get(name.toLowerCase()) ?? null;
 
   const SEP = '\x1e';
-  const log = git(repoDir, ['log', '--no-merges', '-n', '1000', '--numstat', `--pretty=format:${SEP}%H|%an|%ae|%aI|%s`]);
+  const LIMIT = String(Math.max(1, parseInt(process.env.GIT_LOG_LIMIT ?? '5000', 10) || 5000));
+  const log = git(repoDir, ['log', '--no-merges', '-n', LIMIT, '--numstat', `--pretty=format:${SEP}%H|%an|%ae|%aI|%s`]);
   if (!log.ok) return { projectId, configured: true, newCommits: 0 };
 
   const records = log.out.split(SEP).map((s) => s.trim()).filter(Boolean);

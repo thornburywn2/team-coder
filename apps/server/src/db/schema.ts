@@ -69,6 +69,9 @@ export const users = pgTable('users', {
   displayName: varchar('display_name', { length: 100 }),
   color: varchar('color', { length: 20 }), // swim-lane color
   email: varchar('email', { length: 255 }),
+  // additional git author emails for this coder (work laptop, etc.) so commits
+  // attribute correctly even when the git email differs from the login email.
+  gitEmails: text('git_emails').array().notNull().default(sql`'{}'::text[]`),
   agentToken: varchar('agent_token', { length: 128 }).unique(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
@@ -274,6 +277,9 @@ export const sessions = pgTable('sessions', {
   toolCount: integer('tool_count').notNull().default(0),
   inputTokens: integer('input_tokens').notNull().default(0),
   outputTokens: integer('output_tokens').notNull().default(0),
+  cacheReadTokens: integer('cache_read_tokens').notNull().default(0),
+  cacheCreationTokens: integer('cache_creation_tokens').notNull().default(0),
+  model: text('model'), // primary model for the session (for per-model + cost breakdown)
 });
 
 // Durable activity feed — every high-signal event, kept for the whole project so a

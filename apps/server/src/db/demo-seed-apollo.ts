@@ -76,7 +76,7 @@ try {
   const sess: (typeof schema.sessions.$inferInsert)[] = [];
   for (const c of coders) {
     for (let i = 0; i < rand(30, 55); i++) events.push({ projectId: pid, ts: ago(rand(0, 3 * DAY)), sessionId: `ap-${c.username}-hist`, developerId: c.id, project: 'apollo', cwd: `/home/${c.username}/apollo`, eventName: pick(['PreToolUse', 'PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'Stop']), toolName: pick(['Write', 'Edit']), filePath: pick(FILES[c.username]!), payload: {} });
-    for (let i = 0; i < 3; i++) { const pr = rand(3, 14), tl = rand(12, 50); sess.push({ sessionId: `ap-${c.username}-h${i}`, projectId: pid, developerId: c.id, project: 'apollo', startedAt: ago(rand(2 * HOUR, 3 * DAY)), lastSeenAt: ago(rand(3 * HOUR, 2 * DAY)), promptCount: pr, toolCount: tl, inputTokens: tl * rand(1200, 2600) + pr * rand(3000, 6000), outputTokens: (tl + pr) * rand(700, 1700) }); }
+    for (let i = 0; i < 3; i++) { const pr = rand(3, 14), tl = rand(12, 50); sess.push({ sessionId: `ap-${c.username}-h${i}`, projectId: pid, developerId: c.id, project: 'apollo', startedAt: ago(rand(2 * HOUR, 3 * DAY)), lastSeenAt: ago(rand(3 * HOUR, 2 * DAY)), promptCount: pr, toolCount: tl, inputTokens: tl * rand(1200, 2600) + pr * rand(3000, 6000), outputTokens: (tl + pr) * rand(700, 1700), cacheReadTokens: tl * rand(2000, 5000), model: pick(['claude-opus-4-8', 'claude-sonnet-4-6', 'claude-haiku-4-5']) }); }
   }
   // live now: Frank active, Grace active, Ivan idle, Heidi away (idle alert)
   const live = [
@@ -85,7 +85,7 @@ try {
   ];
   for (const l of live) {
     const id = `ap-${l.u}-live`;
-    { const pr = rand(5, 10), tl = rand(20, 45); sess.push({ sessionId: id, projectId: pid, developerId: U[l.u]!.id, project: 'apollo', startedAt: ago(45 * MIN), lastSeenAt: ago(l.last), promptCount: pr, toolCount: tl, inputTokens: tl * rand(1200, 2600) + pr * rand(3000, 6000), outputTokens: (tl + pr) * rand(700, 1700) }); }
+    { const pr = rand(5, 10), tl = rand(20, 45); sess.push({ sessionId: id, projectId: pid, developerId: U[l.u]!.id, project: 'apollo', startedAt: ago(45 * MIN), lastSeenAt: ago(l.last), promptCount: pr, toolCount: tl, inputTokens: tl * rand(1200, 2600) + pr * rand(3000, 6000), outputTokens: (tl + pr) * rand(700, 1700), cacheReadTokens: tl * rand(2000, 5000), model: pick(['claude-opus-4-8', 'claude-sonnet-4-6', 'claude-haiku-4-5']) }); }
     for (let i = 0; i < rand(3, 5); i++) events.push({ projectId: pid, ts: ago(rand(1 * MIN, 20 * MIN)), sessionId: id, developerId: U[l.u]!.id, project: 'apollo', cwd: `/home/${l.u}/apollo`, eventName: 'PreToolUse', toolName: 'Edit', filePath: pick(FILES[l.u]!), payload: {} });
     await db.update(schema.userPresence).set({ status: l.st, lastSeen: ago(l.last), sessionId: id, currentFile: pick(FILES[l.u]!) }).where(eq(schema.userPresence.userId, U[l.u]!.id));
   }

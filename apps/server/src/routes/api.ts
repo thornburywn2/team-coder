@@ -6,8 +6,9 @@ import { getConnection, getConnections } from '../connections';
 import { recentCollisions } from '../collisions';
 import { activeLocks } from '../locks';
 import { recentFeed } from '../feed';
-import { computeOwnership } from '../ownership';
+import { computeOwnership, refreshOwnership } from '../ownership';
 import { buildReport } from '../report';
+import { estimateCost } from '../lib/pricing';
 import { decomposePrd } from '../lib/decompose';
 import { decomposePrdLlm, llmEnabled } from '../lib/decompose-llm';
 import { computeAwards } from '../lib/awards';
@@ -102,23 +103,72 @@ apiRoutes.get('/summary', async (c) => {
   });
 });
 
-// token usage per coder (input/output) — track + minimize spend; aggregated from
-// session rollups. Sorted by total desc.
+// token usage per coder (tokens + estimated $) and a per-model breakdown — track +
+// minimize spend. Cost is computed per session at its model's rate. Sorted desc.
 apiRoutes.get('/usage', async (c) => {
   const pid = c.get('project').id;
-  const [users, agg] = await Promise.all([
+  const [users, rows] = await Promise.all([
     db.select({ id: schema.users.id, displayName: schema.users.displayName, username: schema.users.username, color: schema.users.color }).from(schema.users).where(eq(schema.users.projectId, pid)),
-    db.select({ dev: schema.sessions.developerId, tin: sql<number>`coalesce(sum(${schema.sessions.inputTokens}),0)`, tout: sql<number>`coalesce(sum(${schema.sessions.outputTokens}),0)` }).from(schema.sessions).where(and(eq(schema.sessions.projectId, pid), isNotNull(schema.sessions.developerId))).groupBy(schema.sessions.developerId),
+    db.select({ dev: schema.sessions.developerId, inputTokens: schema.sessions.inputTokens, outputTokens: schema.sessions.outputTokens, cacheReadTokens: schema.sessions.cacheReadTokens, model: schema.sessions.model }).from(schema.sessions).where(and(eq(schema.sessions.projectId, pid), isNotNull(schema.sessions.developerId))),
   ]);
-  const byDev = new Map(agg.filter((r) => r.dev).map((r) => [r.dev as string, r]));
+  type Acc = { tokensIn: number; tokensOut: number; cacheRead: number; cost: number };
+  const perDev = new Map<string, Acc>();
+  const perModel = new Map<string, Acc>();
+  const bump = (m: Map<string, Acc>, k: string, r: { inputTokens: number; outputTokens: number; cacheReadTokens: number; model: string | null }) => {
+    const a = m.get(k) ?? { tokensIn: 0, tokensOut: 0, cacheRead: 0, cost: 0 };
+    a.tokensIn += Number(r.inputTokens); a.tokensOut += Number(r.outputTokens); a.cacheRead += Number(r.cacheReadTokens);
+    a.cost += estimateCost({ inputTokens: Number(r.inputTokens), outputTokens: Number(r.outputTokens), cacheReadTokens: Number(r.cacheReadTokens), model: r.model });
+    m.set(k, a);
+  };
+  for (const r of rows) {
+    if (r.dev) bump(perDev, r.dev, r);
+    bump(perModel, r.model ?? 'unknown', r);
+  }
+  const round = (n: number) => Math.round(n * 100) / 100;
   const coders = users
     .map((u) => {
-      const a = byDev.get(u.id);
-      const tokensIn = Number(a?.tin ?? 0), tokensOut = Number(a?.tout ?? 0);
-      return { developerId: u.id, name: u.displayName ?? u.username, color: u.color, tokensIn, tokensOut, total: tokensIn + tokensOut };
+      const a = perDev.get(u.id) ?? { tokensIn: 0, tokensOut: 0, cacheRead: 0, cost: 0 };
+      return { developerId: u.id, name: u.displayName ?? u.username, color: u.color, tokensIn: a.tokensIn, tokensOut: a.tokensOut, total: a.tokensIn + a.tokensOut, costUsd: round(a.cost) };
     })
     .sort((a, b) => b.total - a.total);
-  return c.json({ coders, total: coders.reduce((s, c2) => s + c2.total, 0) });
+  const models = [...perModel.entries()]
+    .map(([model, a]) => ({ model, tokensIn: a.tokensIn, tokensOut: a.tokensOut, total: a.tokensIn + a.tokensOut, costUsd: round(a.cost) }))
+    .filter((m) => m.total > 0)
+    .sort((a, b) => b.total - a.total);
+  return c.json({ coders, models, total: coders.reduce((s, c2) => s + c2.total, 0), totalCostUsd: round(coders.reduce((s, c2) => s + c2.costUsd, 0)) });
+});
+
+// attribution health: coders' git identities + commit authors we couldn't map to
+// any coder (so they can be fixed). Powers the Report's attribution panel.
+apiRoutes.get('/attribution', async (c) => {
+  const pid = c.get('project').id;
+  const [users, unmapped] = await Promise.all([
+    db.select({ id: schema.users.id, name: schema.users.displayName, username: schema.users.username, email: schema.users.email, gitEmails: schema.users.gitEmails, color: schema.users.color }).from(schema.users).where(eq(schema.users.projectId, pid)),
+    db
+      .select({ authorEmail: schema.gitCommits.authorEmail, authorName: sql<string>`max(${schema.gitCommits.authorName})`, commits: count() })
+      .from(schema.gitCommits)
+      .where(and(eq(schema.gitCommits.projectId, pid), sql`${schema.gitCommits.developerId} is null`, isNotNull(schema.gitCommits.authorEmail)))
+      .groupBy(schema.gitCommits.authorEmail).orderBy(desc(count())),
+  ]);
+  return c.json({ coders: users.map((u) => ({ ...u, name: u.name ?? u.username })), unattributed: unmapped.map((r) => ({ authorEmail: r.authorEmail, authorName: r.authorName, commits: Number(r.commits) })) });
+});
+
+// map an unattributed git author email to a coder: remember the email AND backfill
+// existing commits/file-changes so the attribution is retroactive.
+apiRoutes.post('/attribution/map', async (c) => {
+  const project = c.get('project');
+  const body = (await c.req.json().catch(() => ({}))) as { developerId?: string; email?: string };
+  const email = body.email?.trim().toLowerCase();
+  if (!body.developerId || !email) return c.json({ error: 'developerId and email required' }, 400);
+  const [dev] = await db.select({ id: schema.users.id, gitEmails: schema.users.gitEmails }).from(schema.users).where(and(eq(schema.users.id, body.developerId), eq(schema.users.projectId, project.id)));
+  if (!dev) return c.json({ error: 'unknown coder' }, 400);
+  const emails = Array.from(new Set([...(dev.gitEmails ?? []).map((e) => e.toLowerCase()), email]));
+  await db.update(schema.users).set({ gitEmails: emails }).where(eq(schema.users.id, dev.id));
+  // backfill: claim every commit + file-change by that email for this project
+  const claimed = await db.update(schema.gitCommits).set({ developerId: dev.id }).where(and(eq(schema.gitCommits.projectId, project.id), sql`lower(${schema.gitCommits.authorEmail}) = ${email}`)).returning({ sha: schema.gitCommits.sha });
+  if (claimed.length) await db.update(schema.gitFileChanges).set({ developerId: dev.id }).where(and(eq(schema.gitFileChanges.projectId, project.id), inArray(schema.gitFileChanges.sha, claimed.map((x) => x.sha))));
+  void refreshOwnership();
+  return c.json({ ok: true, backfilled: claimed.length });
 });
 
 // token-usage trend — tokens per day (from session rollups, by last-seen day) so

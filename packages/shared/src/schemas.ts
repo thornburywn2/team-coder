@@ -99,6 +99,9 @@ export const HookEventSchema = z.object({
   // PostToolUse, or a wrapper can attach it) — accept both shapes.
   input_tokens: z.number().int().nonnegative().optional(),
   output_tokens: z.number().int().nonnegative().optional(),
-  usage: z.object({ input_tokens: z.number().int().nonnegative().optional(), output_tokens: z.number().int().nonnegative().optional() }).optional(),
+  cache_read_tokens: z.number().int().nonnegative().optional(),
+  cache_creation_tokens: z.number().int().nonnegative().optional(),
+  model: z.string().optional(),
+  usage: z.object({ input_tokens: z.number().int().nonnegative().optional(), output_tokens: z.number().int().nonnegative().optional(), cache_read_tokens: z.number().int().nonnegative().optional(), cache_creation_tokens: z.number().int().nonnegative().optional() }).optional(),
 });
 export type HookEventPayload = z.infer<typeof HookEventSchema>;

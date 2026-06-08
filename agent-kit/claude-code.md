@@ -63,14 +63,22 @@ the same file at once:
 
 Add this to your `AGENTS.md`/system prompt so the agent does it automatically.
 
-## Track token usage (so we can minimize it)
+## Track token usage (automatic)
 
-The team tracks token spend per person to see where effort goes and improve. Report
-it either way:
-- **Agent:** call the `report_usage` MCP tool with `input_tokens` / `output_tokens`
-  (cumulative or incremental) per task or session.
-- **Hook:** include `input_tokens` / `output_tokens` (or a `usage` object) in your
-  Stop hook payload, or POST them to `<origin>/hooks/usage` with your Bearer token.
+Token spend is captured **automatically** — no agent cooperation needed. Copy
+[`hooks/report-tokens.ts`](./hooks/report-tokens.ts) into your product repo's
+`.claude/hooks/report-tokens.ts` (the provided `settings.json` already wires it to
+the `Stop`/`SubagentStop` hooks). On each stop it reads the local transcript, sums
+the per-turn token usage + model, and reports the **cumulative** totals to the
+portal with `mode:"set"` (idempotent — never double-counts).
 
-It rolls up to your session → per-coder + team totals on the board's 🪙 Token usage
-widget and the Report.
+Alternatives if you're not on Claude Code: call the `report_usage` MCP tool, or
+POST `input_tokens`/`output_tokens`/`model` to `<origin>/hooks/usage`.
+
+It rolls up per coder → the Report's 🪙 Token usage (with estimated $ and a
+per-model breakdown). Cost rates are configurable via `TOKEN_RATES_JSON`.
+
+> **Attribution:** commits are credited by git author email. If your git email
+> differs from your login email, your commits show as *unattributed* in the
+> Report's 🔗 Attribution panel — map them there once and existing commits are
+> backfilled. After that they auto-attribute.

@@ -26,13 +26,15 @@ trust) · 🟢 low (polish / nice-to-have).
 - 🟡 **No CSRF protection / no security headers (helmet)**, no CORS policy.
 - 🟢 **SSO** is planned but absent; identity is self-asserted at login (pick a name).
 
-## 2. Token-usage capture (the feature is built, the *data* isn't guaranteed)
-- 🔴 **No automatic token capture.** Claude Code hooks don't emit token counts by
-  default, so usage only appears if an agent calls `report_usage` or a wrapper posts
-  to `/hooks/usage`. In practice the per-person numbers may be empty/partial — the
-  metric we said is "critical" is opt-in and unenforced.
-- 🟡 **No transcript-based capture** (reading `transcript_path` to compute real
-  usage) and **no $ cost** estimate or per-model breakdown.
+## 2. Token-usage capture — ✅ RESOLVED (2026-06-08)
+- ✅ **Automatic transcript-based capture.** `agent-kit/hooks/report-tokens.ts` runs
+  as a Stop/SubagentStop command hook, reads the local transcript, sums per-turn
+  usage + model, and reports cumulative totals with `mode:"set"` (idempotent — no
+  double-count). No agent cooperation required. Fallbacks: `report_usage` MCP tool
+  and `POST /hooks/usage` (both support add/set, model, cache tokens).
+- ✅ **$ cost + per-model breakdown.** `lib/pricing.ts` (configurable via
+  `TOKEN_RATES_JSON`) estimates cost per session at its model's rate; the Report
+  shows per-coder $ + a per-model split + total. Cache tokens captured too.
 
 ## 3. Coordination is advisory, not enforced
 - 🔴 **Work-locks & collisions don't prevent anything.** `acquire_file` is opt-in,
@@ -52,17 +54,18 @@ trust) · 🟢 low (polish / nice-to-have).
 - 🟡 **No pagination** on most lists (tasks/proposals/comments capped at 100–200);
   fine for a hackathon, breaks on a long/large project.
 
-## 5. Git integration & attribution
-- 🔴 **Attribution silently fails on email mismatch.** Commits map to coders by git
-  author email/name; if a coder's real git email ≠ the one stored, their work is
-  unattributed — and **there's no UI to set/edit a coder's git email**.
-- 🟡 **`main`-only, ff-only.** No branch awareness; the "prove on a branch → inherit"
-  proposal story isn't actually wired to branch diffs. Force-push/rebase breaks the
-  ff-only pull.
-- 🟡 **`git log -n 1000` cap**; first poll of a large existing repo drops older
-  history. No backfill.
+## 5. Git integration & attribution — attribution ✅ RESOLVED (2026-06-08)
+- ✅ **Email-mismatch attribution fixed.** Coders now have `git_emails[]`; git-poll
+  matches any of them. The Report's 🔗 Attribution panel surfaces unmapped commit
+  authors and maps each to a coder via `POST /api/attribution/map`, which remembers
+  the email AND **backfills existing commits + file-changes** (retroactive credit).
+- ✅ **Force-push/rebase tolerated.** A non-ff pull now hard-resets our read-only
+  mirror to upstream (never an engineer's repo). **Log cap raised** to 5000
+  (configurable via `GIT_LOG_LIMIT`).
+- 🟡 **`main`-only.** Still no branch awareness; the "prove on a branch → inherit"
+  proposal story isn't wired to branch diffs. *(left for a later pass)*
 - 🟢 **Local sync (`team-coder-sync.sh`) is opt-in** per engineer; nothing ensures
-  everyone runs it.
+  everyone runs it. *(coordination, not attribution — left for a later pass)*
 
 ## 6. Testing & CI
 - 🔴 **No CI** (`.github/workflows` absent) — nothing runs the 19 verify scripts on

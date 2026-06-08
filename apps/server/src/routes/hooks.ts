@@ -33,17 +33,30 @@ hookRoutes.post('/event', async (c) => {
 
 // Report token usage for attribution (any client: a Stop hook, a wrapper, or the
 // MCP report_usage tool). Rolled up onto the session (→ per-coder + team totals).
+// Report token usage. mode 'add' (default) increments; mode 'set' overwrites the
+// session's totals — use 'set' with the transcript-derived cumulative so repeated
+// Stop hooks stay idempotent (no double-counting). Optional model + cache tokens
+// power the per-model + cost breakdown.
 hookRoutes.post('/usage', async (c) => {
   const dev = c.get('developer');
-  const body = (await c.req.json().catch(() => ({}))) as { session_id?: string; input_tokens?: number; output_tokens?: number };
-  const tIn = Math.max(0, Math.floor(body.input_tokens ?? 0));
-  const tOut = Math.max(0, Math.floor(body.output_tokens ?? 0));
+  const body = (await c.req.json().catch(() => ({}))) as {
+    session_id?: string; input_tokens?: number; output_tokens?: number; cache_read_tokens?: number; cache_creation_tokens?: number; model?: string; mode?: 'add' | 'set';
+  };
+  const n = (v: unknown) => Math.max(0, Math.floor(Number(v) || 0));
+  const tIn = n(body.input_tokens), tOut = n(body.output_tokens), tCacheR = n(body.cache_read_tokens), tCacheC = n(body.cache_creation_tokens);
+  const model = body.model?.trim() || null;
   const sid = body.session_id?.trim() || `usage-${dev.id}`;
+  const set = body.mode === 'set';
   touchHook(dev.id, dev.projectId);
   await db
     .insert(schema.sessions)
-    .values({ sessionId: sid, projectId: dev.projectId, developerId: dev.id, project: null, inputTokens: tIn, outputTokens: tOut })
-    .onConflictDoUpdate({ target: schema.sessions.sessionId, set: { lastSeenAt: new Date(), inputTokens: sql`${schema.sessions.inputTokens} + ${tIn}`, outputTokens: sql`${schema.sessions.outputTokens} + ${tOut}` } });
+    .values({ sessionId: sid, projectId: dev.projectId, developerId: dev.id, project: null, inputTokens: tIn, outputTokens: tOut, cacheReadTokens: tCacheR, cacheCreationTokens: tCacheC, model })
+    .onConflictDoUpdate({
+      target: schema.sessions.sessionId,
+      set: set
+        ? { lastSeenAt: new Date(), inputTokens: tIn, outputTokens: tOut, cacheReadTokens: tCacheR, cacheCreationTokens: tCacheC, model: model ?? sql`${schema.sessions.model}` }
+        : { lastSeenAt: new Date(), inputTokens: sql`${schema.sessions.inputTokens} + ${tIn}`, outputTokens: sql`${schema.sessions.outputTokens} + ${tOut}`, cacheReadTokens: sql`${schema.sessions.cacheReadTokens} + ${tCacheR}`, cacheCreationTokens: sql`${schema.sessions.cacheCreationTokens} + ${tCacheC}`, model: model ?? sql`${schema.sessions.model}` },
+    });
   return c.json({ ok: true });
 });
 
@@ -68,6 +81,9 @@ async function ingest(dev: Developer, ev: HookEventPayload): Promise<void> {
   const status = ev.hook_event_name === 'Stop' ? 'idle' : 'active';
   const tIn = ev.input_tokens ?? ev.usage?.input_tokens ?? 0;
   const tOut = ev.output_tokens ?? ev.usage?.output_tokens ?? 0;
+  const tCacheR = ev.cache_read_tokens ?? ev.usage?.cache_read_tokens ?? 0;
+  const tCacheC = ev.cache_creation_tokens ?? ev.usage?.cache_creation_tokens ?? 0;
+  const model = ev.model ?? null;
 
   // presence patch — only set fields the event actually informs
   const presence: Record<string, unknown> = {
@@ -94,7 +110,7 @@ async function ingest(dev: Developer, ev: HookEventPayload): Promise<void> {
     db
       .insert(schema.sessions)
       // count this first event too (defaults are 0; the upsert path increments later)
-      .values({ sessionId: ev.session_id, projectId: dev.projectId, developerId: dev.id, project, promptCount: isPrompt ? 1 : 0, toolCount: isTool ? 1 : 0, inputTokens: tIn, outputTokens: tOut })
+      .values({ sessionId: ev.session_id, projectId: dev.projectId, developerId: dev.id, project, promptCount: isPrompt ? 1 : 0, toolCount: isTool ? 1 : 0, inputTokens: tIn, outputTokens: tOut, cacheReadTokens: tCacheR, cacheCreationTokens: tCacheC, model })
       .onConflictDoUpdate({
         target: schema.sessions.sessionId,
         set: {
@@ -103,6 +119,9 @@ async function ingest(dev: Developer, ev: HookEventPayload): Promise<void> {
           toolCount: sql`${schema.sessions.toolCount} + ${isTool ? 1 : 0}`,
           inputTokens: sql`${schema.sessions.inputTokens} + ${tIn}`,
           outputTokens: sql`${schema.sessions.outputTokens} + ${tOut}`,
+          cacheReadTokens: sql`${schema.sessions.cacheReadTokens} + ${tCacheR}`,
+          cacheCreationTokens: sql`${schema.sessions.cacheCreationTokens} + ${tCacheC}`,
+          model: model ?? sql`${schema.sessions.model}`,
         },
       }),
     db.update(schema.userPresence).set(presence).where(eq(schema.userPresence.userId, dev.id)),

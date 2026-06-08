@@ -14,13 +14,13 @@ export function reportToMarkdown(r: Report): string {
   const lines: string[] = [];
   lines.push(`# Team Coder — Contribution Report`);
   lines.push(`\n_Generated ${new Date(r.generatedAt).toLocaleString()}_\n`);
-  lines.push(`**Totals:** ${r.totals.commits} commits · +${r.totals.linesAdded} lines · ${r.totals.tasksCompleted} tasks done · ${r.totals.activeMinutes} active min\n`);
+  lines.push(`**Totals:** ${r.totals.commits} commits · +${r.totals.linesAdded} lines · ${r.totals.tasksCompleted} tasks done · ${r.totals.activeMinutes} active min · ${(r.totals.tokensIn + r.totals.tokensOut).toLocaleString()} tokens · $${r.totals.estimatedCostUsd.toFixed(2)} est.\n`);
 
   lines.push(`## Contribution by coder\n`);
-  lines.push(`| Coder | Blended % | Commits | +Lines | Files | Edits | Tasks | Decisions | Patterns |`);
-  lines.push(`|---|--:|--:|--:|--:|--:|--:|--:|--:|`);
+  lines.push(`| Coder | Blended % | Commits | +Lines | Files | Edits | Tasks | Decisions | Patterns | Tokens | Est. $ |`);
+  lines.push(`|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|`);
   for (const c of r.coders) {
-    lines.push(`| ${c.name} | ${c.pct.blended}% | ${c.commits} | ${c.linesAdded} | ${c.filesTouched} | ${c.edits} | ${c.tasksCompleted} | ${c.decisions} | ${c.patterns} |`);
+    lines.push(`| ${c.name} | ${c.pct.blended}% | ${c.commits} | ${c.linesAdded} | ${c.filesTouched} | ${c.edits} | ${c.tasksCompleted} | ${c.decisions} | ${c.patterns} | ${(c.tokensIn + c.tokensOut).toLocaleString()} | $${c.estimatedCostUsd.toFixed(2)} |`);
   }
 
   const basis = r.analysisBasis === 'lines' ? 'lines' : 'edits';

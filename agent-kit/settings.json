@@ -63,6 +63,11 @@
               "X-Developer-Id": "${DEVELOPER_ID}"
             },
             "allowedEnvVars": ["TEAM_CODER_URL", "TEAM_CODER_TOKEN", "DEVELOPER_ID"]
+          },
+          {
+            "type": "command",
+            "command": "bun .claude/hooks/report-tokens.ts",
+            "timeout": 10
           }
         ]
       }
@@ -79,6 +84,11 @@
               "X-Developer-Id": "${DEVELOPER_ID}"
             },
             "allowedEnvVars": ["TEAM_CODER_URL", "TEAM_CODER_TOKEN", "DEVELOPER_ID"]
+          },
+          {
+            "type": "command",
+            "command": "bun .claude/hooks/report-tokens.ts",
+            "timeout": 10
           }
         ]
       }
