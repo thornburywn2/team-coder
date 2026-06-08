@@ -4,6 +4,30 @@
 
 ---
 
+## 2026-06-08 (i) — Work-locks, token trend, board IA, vote 500 fix
+
+**Scope:** apps/server (locks, usage trend, vote/comment hardening), apps/web (widgets, IA, identity revalidation), agent-kit
+**Outcome:** SUCCESS
+
+- **Hold-until-released work-locks:** locks.ts (in-memory, per-project, 15-min TTL)
+  + MCP `acquire_file`/`release_file`/`check_file` + GET /api/locks + a 🔒 board
+  widget. An agent acquires a file before editing; another holds until release.
+  Opt-in/advisory, auto-expires. (28 MCP tools.)
+- **Token-trend chart** (GET /api/usage/trend) — daily token spend, in 📈 Trends.
+- **Board IA:** Notes front-and-center under ⭐ Needs your attention; Trends moved
+  up; Locks added.
+- **Fixed the vote 500:** it was a FK violation from a STALE logged-in id after a
+  demo re-seed. Hardened server (validate voter/author in project → 400) and the
+  client now re-validates `meId` against the roster on load (re-prompts if stale).
+
+All 19 verify green.
+
+**Lesson:** Any client-supplied id written to a NOT-NULL FK must be validated
+server-side (→400), and the SPA must re-validate its cached identity against the
+live roster — otherwise a re-seed/rotation turns into a confusing 500.
+
+---
+
 ## 2026-06-08 (h) — Token tracking + board hierarchy + 3 tabs
 
 **Scope:** apps/server (usage capture/aggregate, summary), apps/web (board IA, widgets, inline proposals), agent-kit

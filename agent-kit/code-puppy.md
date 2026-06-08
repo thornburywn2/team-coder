@@ -25,8 +25,9 @@ as its source of truth, e.g.:
 Before starting work, call the team-coder MCP tools: `get_project_goal`,
 `get_my_tasks`, and `get_module_context` for the area you're touching. Claim work
 with `claim_task`, report progress with `update_task_progress`, and raise
-direction changes with `create_proposal`. Don't rebuild — check
-`get_shared_patterns` first.
+direction changes with `create_proposal`. Before editing a file, `acquire_file` it
+and hold/retry if another agent holds it; `release_file` when done. Don't rebuild —
+check `get_shared_patterns` first. Report token usage with `report_usage`.
 ```
 
 ## Confirm

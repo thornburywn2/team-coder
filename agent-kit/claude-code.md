@@ -48,7 +48,20 @@ Reads: `whoami`, `get_my_tasks`, `list_tasks`, `list_team`, `get_task`,
 Writes: `create_task`, `claim_task`, `assign_task`, `edit_task`,
 `update_task_progress`, `complete_task`, `flag_blocker`, `post_comment`,
 `create_proposal`, `vote_proposal`, `post_decision`, `add_shared_pattern`,
-`report_usage`.
+`report_usage`, `acquire_file`, `release_file`, `check_file`.
+
+## Don't collide — hold until released
+
+Before editing a file in a shared area, take a soft lock so two agents don't work
+the same file at once:
+1. Call **`acquire_file(file_path)`**. If `acquired: true`, go ahead.
+2. If `acquired: false` (it returns `held_by`), **hold**: wait and retry
+   `acquire_file` every ~30s until it succeeds (the holder will release, or the
+   lock auto-expires after 15 min).
+3. Call **`release_file(file_path)`** as soon as you're done so a waiting teammate
+   can proceed. Use `check_file` to peek without taking the lock.
+
+Add this to your `AGENTS.md`/system prompt so the agent does it automatically.
 
 ## Track token usage (so we can minimize it)
 
