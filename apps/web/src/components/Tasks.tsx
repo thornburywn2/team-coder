@@ -59,7 +59,9 @@ export function Tasks() {
                 <span className={`badge ${t.status}`}>{t.status.replace('_', ' ')}</span>
                 {t.source === 'prd' && <span className="goal-tag" title="from the project goal (PRD)">🎯</span>}
                 {t.source === 'proposal' && <span className="goal-tag" title="from an adopted proposal">💡</span>}
+                {t.priority !== 'medium' && <span className={`prio prio-${t.priority}`} title={`${t.priority} priority`}>{t.priority}</span>}
                 <span className="task-title">{t.title}</span>
+                {t.tags?.map((tag) => <span key={tag} className="task-tag">{tag}</span>)}
                 {owner && (
                   <span className="owner">
                     <span className="dot sm" style={{ background: owner.color ?? '#888' }} />

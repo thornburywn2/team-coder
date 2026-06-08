@@ -36,6 +36,13 @@
       "when": 1780877020307,
       "tag": "0004_cuddly_omega_red",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1780877311985,
+      "tag": "0005_fixed_wiccan",
+      "breakpoints": true
     }
   ]
 }

@@ -19,6 +19,7 @@ export const taskStatus = pgEnum('task_status', [
   'todo', 'in_progress', 'in_review', 'done', 'blocked',
 ]);
 export const taskSource = pgEnum('task_source', ['manual', 'prd', 'proposal']);
+export const taskPriority = pgEnum('task_priority', ['low', 'medium', 'high', 'urgent']);
 export const proposalStatus = pgEnum('proposal_status', [
   'draft', 'open', 'accepted', 'rejected', 'withdrawn',
 ]);
@@ -106,6 +107,9 @@ export const tasks = pgTable('tasks', {
   description: text('description'),
   status: taskStatus('status').notNull().default('todo'),
   source: taskSource('source').notNull().default('manual'), // 'prd' = derived from the project goal
+  priority: taskPriority('priority').notNull().default('medium'),
+  tags: jsonb('tags').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  dueDate: timestamp('due_date', { withTimezone: true }),
   assigneeId: uuid('assignee_id').references(() => users.id, { onDelete: 'set null' }),
   reporterId: uuid('reporter_id').references(() => users.id, { onDelete: 'set null' }),
   moduleId: uuid('module_id').references(() => modules.id, { onDelete: 'set null' }),

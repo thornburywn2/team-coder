@@ -75,6 +75,9 @@ export interface Task {
   description: string | null;
   status: 'todo' | 'in_progress' | 'in_review' | 'done' | 'blocked';
   source: 'manual' | 'prd' | 'proposal';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  tags: string[];
+  dueDate: string | null;
   assigneeId: string | null;
   moduleId: string | null;
   filePaths: string[];

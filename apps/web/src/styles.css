@@ -203,6 +203,11 @@ main { display: grid; grid-template-columns: 1fr 360px; gap: 1rem; align-items: 
 .prd-actions .primary, .gen-btn { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 0.35rem 0.7rem; font-weight: 600; cursor: pointer; font-size: 0.8rem; }
 .gen-btn { margin-left: auto; }
 .goal-tag { font-size: 0.75rem; flex: none; }
+.prio { font-size: 0.6rem; text-transform: uppercase; font-weight: 700; padding: 0.1rem 0.35rem; border-radius: 4px; flex: none; }
+.prio-low { color: var(--gray); border: 1px solid var(--border); }
+.prio-high { color: var(--amber); background: rgba(245,166,35,0.14); }
+.prio-urgent { color: #fff; background: #c0392b; }
+.task-tag { font-size: 0.62rem; color: var(--accent); background: rgba(91,140,255,0.12); padding: 0.1rem 0.4rem; border-radius: 4px; flex: none; }
 
 /* ── PRD decomposition review ───────────────────────────── */
 .decompose { margin-top: 0.8rem; background: var(--panel-2); }

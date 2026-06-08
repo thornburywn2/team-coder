@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { and, desc, eq, ilike, ne, or, type SQL } from 'drizzle-orm';
-import { TASK_STATUS, VOTE_VALUE } from '@team-coder/shared';
+import { TASK_PRIORITY, TASK_STATUS, VOTE_VALUE } from '@team-coder/shared';
 import { db, schema } from '../db';
 import type { Developer } from '../auth';
 import { computeOwnership } from '../ownership';
@@ -21,9 +21,26 @@ const TASK_FIELDS = {
   id: schema.tasks.id,
   title: schema.tasks.title,
   status: schema.tasks.status,
+  priority: schema.tasks.priority,
+  tags: schema.tasks.tags,
+  dueDate: schema.tasks.dueDate,
   moduleId: schema.tasks.moduleId,
   assigneeId: schema.tasks.assigneeId,
 };
+
+// Optional task-metadata edits shared by create_task + edit_task.
+const META_INPUT = {
+  priority: z.enum(TASK_PRIORITY).optional(),
+  tags: z.array(z.string()).optional(),
+  due_date: z.string().describe('ISO date/time, or empty string to clear').optional(),
+};
+function metaPatch(m: { priority?: string; tags?: string[]; due_date?: string }): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  if (m.priority) patch['priority'] = m.priority;
+  if (m.tags) patch['tags'] = m.tags;
+  if (m.due_date !== undefined) patch['dueDate'] = m.due_date ? new Date(m.due_date) : null;
+  return patch;
+}
 
 export function createMcpServer(dev: Developer): McpServer {
   const server = new McpServer({ name: 'team-coder', version: '1.0.0' });
@@ -41,6 +58,49 @@ export function createMcpServer(dev: Developer): McpServer {
         .select(TASK_FIELDS)
         .from(schema.tasks)
         .where(and(eq(schema.tasks.projectId, pid), eq(schema.tasks.assigneeId, dev.id), ne(schema.tasks.status, 'done')));
+      return text(rows);
+    },
+  );
+
+  server.registerTool(
+    'list_tasks',
+    {
+      description: 'List the whole team backlog (everyone\'s tasks). Optionally filter by status. Use this to see all work, not just yours.',
+      inputSchema: { status: z.enum(TASK_STATUS).optional(), include_done: z.boolean().optional().describe('include done tasks (default false)') },
+    },
+    async ({ status, include_done }) => {
+      const conds = [eq(schema.tasks.projectId, pid)];
+      if (status) conds.push(eq(schema.tasks.status, status));
+      else if (!include_done) conds.push(ne(schema.tasks.status, 'done'));
+      const rows = await db.select(TASK_FIELDS).from(schema.tasks).where(and(...conds)).orderBy(desc(schema.tasks.createdAt)).limit(200);
+      return text(rows);
+    },
+  );
+
+  server.registerTool(
+    'list_team',
+    { description: 'The team roster — everyone on this project (id, username, display name). Use to find who to assign work to.', inputSchema: {} },
+    async () => {
+      const rows = await db
+        .select({ id: schema.users.id, username: schema.users.username, displayName: schema.users.displayName })
+        .from(schema.users)
+        .where(eq(schema.users.projectId, pid));
+      return text(rows);
+    },
+  );
+
+  server.registerTool(
+    'get_comments',
+    {
+      description: 'Read the discussion thread (comments + progress notes) on a task or proposal.',
+      inputSchema: { target_type: z.enum(['task', 'proposal']), target_id: z.string() },
+    },
+    async ({ target_type, target_id }) => {
+      const rows = await db
+        .select({ id: schema.comments.id, authorId: schema.comments.authorId, content: schema.comments.content, createdAt: schema.comments.createdAt })
+        .from(schema.comments)
+        .where(and(eq(schema.comments.projectId, pid), eq(schema.comments.targetType, target_type), eq(schema.comments.targetId, target_id)))
+        .orderBy(schema.comments.createdAt);
       return text(rows);
     },
   );
@@ -191,10 +251,10 @@ export function createMcpServer(dev: Developer): McpServer {
   server.registerTool(
     'create_task',
     {
-      description: 'Create a new task on the board — e.g. work you discovered or are breaking down. Optionally tie it to a module (by name or path prefix).',
-      inputSchema: { title: z.string(), description: z.string().optional(), module: z.string().optional() },
+      description: 'Create a new task on the board — e.g. work you discovered or are breaking down. Optionally tie it to a module (by name or path prefix) and set priority/tags/due date.',
+      inputSchema: { title: z.string(), description: z.string().optional(), module: z.string().optional(), ...META_INPUT },
     },
-    async ({ title, description, module }) => {
+    async ({ title, description, module, ...meta }) => {
       let moduleId: string | null = null;
       if (module) {
         const [m] = await db
@@ -205,7 +265,7 @@ export function createMcpServer(dev: Developer): McpServer {
       }
       const [row] = await db
         .insert(schema.tasks)
-        .values({ projectId: pid, title, description: description ?? null, moduleId, reporterId: dev.id })
+        .values({ projectId: pid, title, description: description ?? null, moduleId, reporterId: dev.id, ...metaPatch(meta) })
         .returning(TASK_FIELDS);
       pushFeed(pid, { ...feedBase, kind: 'created', detail: `created "${row!.title}"` });
       return text({ ok: true, task: row });
@@ -215,11 +275,11 @@ export function createMcpServer(dev: Developer): McpServer {
   server.registerTool(
     'edit_task',
     {
-      description: "Edit a task's title and/or description (rename or reword).",
-      inputSchema: { task_id: z.string(), title: z.string().optional(), description: z.string().optional() },
+      description: "Edit a task: title, description, priority, tags, and/or due date.",
+      inputSchema: { task_id: z.string(), title: z.string().optional(), description: z.string().optional(), ...META_INPUT },
     },
-    async ({ task_id, title, description }) => {
-      const patch: Record<string, unknown> = { updatedAt: new Date() };
+    async ({ task_id, title, description, ...meta }) => {
+      const patch: Record<string, unknown> = { updatedAt: new Date(), ...metaPatch(meta) };
       if (title !== undefined) patch['title'] = title;
       if (description !== undefined) patch['description'] = description;
       const [row] = await db.update(schema.tasks).set(patch).where(inProject(eq(schema.tasks.id, task_id))).returning(TASK_FIELDS);
@@ -268,10 +328,12 @@ export function createMcpServer(dev: Developer): McpServer {
 
   server.registerTool(
     'update_task_progress',
-    { description: 'Update a task status and optionally add a progress note.', inputSchema: { task_id: z.string(), status: z.enum(TASK_STATUS), note: z.string().optional() } },
+    { description: 'Update a task status and optionally add a progress note (the note is saved to the task thread so anyone can read it back).', inputSchema: { task_id: z.string(), status: z.enum(TASK_STATUS), note: z.string().optional() } },
     async ({ task_id, status, note }) => {
       const [row] = await db.update(schema.tasks).set({ status, updatedAt: new Date() }).where(inProject(eq(schema.tasks.id, task_id))).returning(TASK_FIELDS);
       if (!row) return text({ error: 'task not found' });
+      // persist the note as a durable, readable comment (not just an ephemeral feed item)
+      if (note?.trim()) await db.insert(schema.comments).values({ projectId: pid, authorId: dev.id, targetType: 'task', targetId: task_id, content: note.trim() });
       pushFeed(pid, { ...feedBase, kind: status === 'done' ? 'done' : 'claim', detail: `${status.replace('_', ' ')}: "${row.title}"${note ? ` — ${note}` : ''}` });
       return text({ ok: true, task: row });
     },

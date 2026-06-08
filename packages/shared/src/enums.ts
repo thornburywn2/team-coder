@@ -10,6 +10,10 @@ export type TaskStatus = (typeof TASK_STATUS)[number];
 export const TASK_SOURCE = ['manual', 'prd', 'proposal'] as const;
 export type TaskSource = (typeof TASK_SOURCE)[number];
 
+// Task priority for triage / sorting.
+export const TASK_PRIORITY = ['low', 'medium', 'high', 'urgent'] as const;
+export type TaskPriority = (typeof TASK_PRIORITY)[number];
+
 export const PROPOSAL_STATUS = ['draft', 'open', 'accepted', 'rejected', 'withdrawn'] as const;
 export type ProposalStatus = (typeof PROPOSAL_STATUS)[number];
 

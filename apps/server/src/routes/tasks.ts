@@ -29,6 +29,9 @@ taskRoutes.post('/', async (c) => {
     description?: string;
     moduleId?: string;
     reporterId?: string;
+    priority?: 'low' | 'medium' | 'high' | 'urgent';
+    tags?: string[];
+    dueDate?: string;
   };
   if (!body.title?.trim()) return c.json({ error: 'title required' }, 400);
   const [row] = await db
@@ -39,6 +42,9 @@ taskRoutes.post('/', async (c) => {
       description: body.description ?? null,
       moduleId: body.moduleId ?? null,
       reporterId: body.reporterId ?? null,
+      ...(body.priority ? { priority: body.priority } : {}),
+      ...(Array.isArray(body.tags) ? { tags: body.tags } : {}),
+      ...(body.dueDate ? { dueDate: new Date(body.dueDate) } : {}),
     })
     .returning();
   return c.json(row, 201);
