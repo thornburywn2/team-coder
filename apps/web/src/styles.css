@@ -150,6 +150,35 @@ main { display: grid; grid-template-columns: 1fr 360px; gap: 1rem; align-items: 
 .mod-legend { display: flex; flex-wrap: wrap; gap: 0.75rem; font-size: 0.72rem; color: var(--muted); margin-top: 0.35rem; }
 .mod-legend span { display: inline-flex; align-items: center; gap: 0.25rem; }
 
+/* language / layer breakdowns */
+.report-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 760px) { .report-cols { grid-template-columns: 1fr; } }
+.breakdown { display: flex; flex-direction: column; gap: 0.5rem; }
+.bd-row { display: grid; grid-template-columns: 90px 1fr 130px; align-items: center; gap: 0.5rem; font-size: 0.8rem; }
+.bd-name { font-weight: 600; }
+.bd-val { text-align: right; color: var(--text); }
+.breakdown .bar { height: 10px; background: var(--panel-2); border-radius: 999px; overflow: hidden; }
+.breakdown .bar div { height: 100%; border-radius: 999px; }
+
+/* created-project coder tokens */
+.created-coders { list-style: none; margin: 0 0 0.9rem; padding: 0; }
+.created-coders li { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0; border-top: 1px solid var(--border); font-size: 0.78rem; }
+.created-coders .who { width: 90px; font-weight: 600; flex: none; }
+.created-coders code { flex: 1; color: var(--accent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* agents view */
+.agents-view { display: flex; flex-direction: column; gap: 0.8rem; max-width: 900px; }
+.coder-agents .ca-head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+.agent-list { list-style: none; margin: 0; padding: 0; }
+.agent { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-top: 1px solid var(--border); font-size: 0.8rem; flex-wrap: wrap; }
+.agent.status-away { opacity: 0.55; }
+.agent-id { font-family: ui-monospace, Menlo, monospace; color: var(--muted); }
+.agent-status { font-size: 0.6rem; text-transform: uppercase; padding: 0.1rem 0.35rem; border-radius: 4px; background: var(--panel-2); }
+.agent.status-active .agent-status { color: var(--green); }
+.agent-stats { color: var(--muted); }
+.agent-file { color: var(--accent); font-size: 0.72rem; word-break: break-all; }
+.agent .time { margin-left: auto; color: var(--gray); font-size: 0.7rem; }
+
 .timeline { display: flex; align-items: flex-end; gap: 2px; height: 80px; padding-top: 0.5rem; }
 .tl-bar { flex: 1; min-width: 2px; background: var(--accent); border-radius: 2px 2px 0 0; opacity: 0.8; }
 

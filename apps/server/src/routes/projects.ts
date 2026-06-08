@@ -8,15 +8,11 @@ import { db, schema } from '../db';
 
 export const publicProjectRoutes = new Hono();
 
-// Starter coders/modules mirror the dev seed, but with per-project-unique agent
-// tokens (agent_token is globally unique, so they must not collide across projects).
-const STARTER_CODERS = [
-  { username: 'alice', displayName: 'Alice', email: 'alice@teamcoder.dev', color: '#e6194B' },
-  { username: 'bob', displayName: 'Bob', email: 'bob@teamcoder.dev', color: '#3cb44b' },
-  { username: 'carol', displayName: 'Carol', email: 'carol@teamcoder.dev', color: '#4363d8' },
-  { username: 'dave', displayName: 'Dave', email: 'dave@teamcoder.dev', color: '#f58231' },
-  { username: 'erin', displayName: 'Erin', email: 'erin@teamcoder.dev', color: '#911eb4' },
-];
+// Color palette cycled across the team roster (swim-lane colors).
+const COLORS = ['#e6194B', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6', '#bfef45', '#fabed4', '#469990'];
+
+// Fallback roster when the creator doesn't name their team (dev/demo only).
+const STARTER_NAMES = ['Alice', 'Bob', 'Carol', 'Dave', 'Erin'];
 
 const STARTER_MODULES = [
   { name: 'frontend', pathPrefix: 'apps/web/' },
@@ -24,10 +20,31 @@ const STARTER_MODULES = [
   { name: 'shared', pathPrefix: 'packages/shared/' },
 ];
 
+// Turn the creator's typed team-member names into seed-able coder rows (unique
+// usernames + per-project-unique agent tokens). SSO will replace this later.
+function rosterFrom(names: string[], projectId: string) {
+  const seenU = new Set<string>();
+  return names.map((raw, i) => {
+    const displayName = raw.trim().slice(0, 100);
+    let username = displayName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || `coder-${i + 1}`;
+    while (seenU.has(username)) username = `${username}-${i}`;
+    seenU.add(username);
+    return { projectId, username, displayName, color: COLORS[i % COLORS.length]!, agentToken: `dev-${crypto.randomUUID()}` };
+  });
+}
+
 publicProjectRoutes.post('/', async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as { name?: string; githubRepoUrl?: string };
+  const body = (await c.req.json().catch(() => ({}))) as { name?: string; githubRepoUrl?: string; members?: string[] };
   const name = body.name?.trim();
   if (!name) return c.json({ error: 'name required' }, 400);
+
+  // team members chosen at creation time (deduped, non-empty); falls back to the
+  // demo roster only if none were given.
+  const memberNames = (Array.isArray(body.members) ? body.members : [])
+    .map((m) => (typeof m === 'string' ? m.trim() : ''))
+    .filter(Boolean)
+    .slice(0, 50);
+  const names = memberNames.length ? memberNames : STARTER_NAMES;
 
   const token = `tc-${crypto.randomUUID()}`;
   const [proj] = await db
@@ -38,7 +55,7 @@ publicProjectRoutes.post('/', async (c) => {
 
   const inserted = await db
     .insert(schema.users)
-    .values(STARTER_CODERS.map((u) => ({ ...u, projectId, agentToken: `dev-${crypto.randomUUID()}` })))
+    .values(rosterFrom(names, projectId))
     .returning({ id: schema.users.id, username: schema.users.username, displayName: schema.users.displayName, agentToken: schema.users.agentToken });
 
   await db

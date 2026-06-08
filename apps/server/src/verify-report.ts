@@ -18,6 +18,9 @@ const BASE = process.env.BASE_URL ?? `http://localhost:${process.env.PORT ?? 630
 interface Report {
   coders: Array<{ name: string; commits: number; linesAdded: number; edits: number; pct: { blended: number } }>;
   modules: Array<{ pathPrefix: string; totalLines: number; contributors: Array<{ name: string }> }>;
+  languages: Array<{ name: string; pct: number }>;
+  layers: Array<{ name: string; pct: number }>;
+  analysisBasis: string;
   totals: { commits: number; linesAdded: number };
 }
 
@@ -58,6 +61,11 @@ try {
   check(!!shared && shared.contributors.some((c) => c.name === 'Carol'), 'shared module credits Carol by LOC');
 
   check(report.totals.commits >= 1 && report.totals.linesAdded >= 1, `totals populated (commits=${report.totals.commits}, +${report.totals.linesAdded})`);
+
+  // language + layer analysis (git basis, since we ingested commits)
+  check(report.analysisBasis === 'lines', `analysis basis is git lines (got ${report.analysisBasis})`);
+  check(report.languages.some((l) => l.name === 'TypeScript'), 'languages breakdown identifies TypeScript');
+  check(report.layers.some((l) => l.name === 'backend'), 'layer breakdown places foo.ts in backend');
 } catch (err) {
   console.error('❌', err instanceof Error ? err.message : err);
   ok = false;

@@ -1,6 +1,7 @@
 import { and, count, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { db, schema } from './db';
 import { computeOwnership } from './ownership';
+import { languageOf, layerOf } from './lib/classify';
 
 // Contribution report — aggregates every signal we capture (git LOC, hook edits,
 // sessions, tasks, decisions, patterns) into a per-coder breakdown with multiple
@@ -38,18 +39,27 @@ export interface TimelineBucket {
   perCoder: Record<string, number>;
 }
 
+export interface Breakdown {
+  name: string;
+  value: number;
+  pct: number;
+}
+
 export interface Report {
   generatedAt: string;
   coders: CoderStat[];
   modules: ModuleStat[];
   timeline: TimelineBucket[];
+  languages: Breakdown[]; // what the team writes in
+  layers: Breakdown[]; // where in the stack: frontend/backend/database/infra/docs
+  analysisBasis: 'lines' | 'edits'; // git LOC if available, else live hook edits
   totals: { commits: number; linesAdded: number; tasksCompleted: number; activeMinutes: number };
 }
 
 const num = (v: unknown): number => Number(v ?? 0);
 
 export async function buildReport(projectId: string, generatedAt: string): Promise<Report> {
-  const [users, gitAgg, filesAgg, modLinesAgg, editAgg, sessAgg, taskAgg, adrAgg, patAgg, timelineAgg, ownership] =
+  const [users, gitAgg, filesAgg, modLinesAgg, editAgg, sessAgg, taskAgg, adrAgg, patAgg, timelineAgg, ownership, extra1, extra2] =
     await Promise.all([
       db.select({ id: schema.users.id, name: schema.users.displayName, username: schema.users.username, color: schema.users.color }).from(schema.users).where(eq(schema.users.projectId, projectId)),
       db
@@ -76,7 +86,16 @@ export async function buildReport(projectId: string, generatedAt: string): Promi
         .select({ bucket: sql<string>`to_char(date_trunc('hour', ${schema.hookEvents.ts}), 'YYYY-MM-DD"T"HH24:00')`, dev: schema.hookEvents.developerId, n: count() })
         .from(schema.hookEvents).where(and(eq(schema.hookEvents.projectId, projectId), isNotNull(schema.hookEvents.developerId))).groupBy(sql`1`, schema.hookEvents.developerId).orderBy(sql`1`),
       computeOwnership(projectId, 60 * 24 * 14), // 2-week window: "owned" for the whole event
+      // raw file paths for language/layer analysis: git LOC (authoritative) +
+      // hook edits (fallback so the breakdown is non-empty before git is configured)
+      db
+        .select({ filePath: schema.gitFileChanges.filePath, lines: sql<number>`coalesce(sum(${schema.gitFileChanges.additions}),0)` })
+        .from(schema.gitFileChanges).where(eq(schema.gitFileChanges.projectId, projectId)).groupBy(schema.gitFileChanges.filePath),
+      db
+        .select({ filePath: schema.hookEvents.filePath, n: count() })
+        .from(schema.hookEvents).where(and(eq(schema.hookEvents.projectId, projectId), isNotNull(schema.hookEvents.filePath))).groupBy(schema.hookEvents.filePath),
     ]);
+  const [gitFilesAgg, hookFilesAgg] = [extra1, extra2];
 
   const byDev = <T extends { dev: string | null }>(rows: T[]) => new Map(rows.filter((r) => r.dev).map((r) => [r.dev as string, r]));
   const git = byDev(gitAgg);
@@ -153,11 +172,29 @@ export async function buildReport(projectId: string, generatedAt: string): Promi
     return { t, perCoder };
   });
 
+  // language + layer breakdown — git LOC if we have any, else live hook edits
+  const useGit = gitFilesAgg.length > 0;
+  const analysisBasis: 'lines' | 'edits' = useGit ? 'lines' : 'edits';
+  const files2 = useGit
+    ? gitFilesAgg.map((r) => ({ file: r.filePath, w: num(r.lines) }))
+    : hookFilesAgg.filter((r) => r.filePath).map((r) => ({ file: r.filePath as string, w: num(r.n) }));
+  const tally = (key: (f: string) => string): Breakdown[] => {
+    const m = new Map<string, number>();
+    for (const { file, w } of files2) m.set(key(file), (m.get(key(file)) ?? 0) + w);
+    const total = [...m.values()].reduce((a, b) => a + b, 0);
+    return [...m.entries()]
+      .map(([name, value]) => ({ name, value, pct: pctOf(value, total) }))
+      .sort((a, b) => b.value - a.value);
+  };
+
   return {
     generatedAt,
     coders,
     modules,
     timeline,
+    languages: tally(languageOf),
+    layers: tally(layerOf),
+    analysisBasis,
     totals: { commits: totCommits, linesAdded: totLines, tasksCompleted: totTasks, activeMinutes: sum((c) => c.activeMinutes) },
   };
 }

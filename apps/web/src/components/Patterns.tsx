@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api, createPattern, deletePattern, listPatterns, type Pattern, type User } from '../lib/api';
+import { copyText } from '../lib/clipboard';
 import { queryClient } from '../lib/query';
 import { useStore } from '../store';
 
@@ -10,7 +11,7 @@ import { useStore } from '../store';
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <button className="copy-btn" onClick={() => { navigator.clipboard?.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>
+    <button className="copy-btn" onClick={async () => { const ok = await copyText(text); setCopied(ok); setTimeout(() => setCopied(false), 1500); }}>
       {copied ? 'copied ✓' : 'copy'}
     </button>
   );

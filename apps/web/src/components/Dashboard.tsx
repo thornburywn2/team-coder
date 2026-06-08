@@ -15,12 +15,13 @@ import { Tasks } from './Tasks';
 import { Report } from './Report';
 import { Proposals } from './Proposals';
 import { Patterns } from './Patterns';
+import { Agents } from './Agents';
 import { Connect } from './Connect';
 
 export function Dashboard() {
   const { token, connected, setConnected, hydratePresence, applyPresence, hydrateFeed, pushFeed, setOwnership, hydrateCollisions, pushCollision, logout } =
     useStore();
-  const [view, setView] = useState<'board' | 'proposals' | 'patterns' | 'report' | 'connect'>('board');
+  const [view, setView] = useState<'board' | 'proposals' | 'patterns' | 'agents' | 'report' | 'connect'>('board');
   const { data: project } = useQuery({ queryKey: ['project'], queryFn: () => api<ProjectInfo>('/projects/current') });
 
   useEffect(() => {
@@ -86,6 +87,7 @@ export function Dashboard() {
           <button className={view === 'board' ? 'active' : ''} onClick={() => setView('board')}>Board</button>
           <button className={view === 'proposals' ? 'active' : ''} onClick={() => setView('proposals')}>Proposals</button>
           <button className={view === 'patterns' ? 'active' : ''} onClick={() => setView('patterns')}>Reuse kit</button>
+          <button className={view === 'agents' ? 'active' : ''} onClick={() => setView('agents')}>Agents</button>
           <button className={view === 'report' ? 'active' : ''} onClick={() => setView('report')}>Report</button>
           <button className={view === 'connect' ? 'active' : ''} onClick={() => setView('connect')}>Connect agent</button>
         </nav>
@@ -109,6 +111,8 @@ export function Dashboard() {
         <Proposals />
       ) : view === 'patterns' ? (
         <Patterns />
+      ) : view === 'agents' ? (
+        <Agents />
       ) : view === 'report' ? (
         <Report />
       ) : (

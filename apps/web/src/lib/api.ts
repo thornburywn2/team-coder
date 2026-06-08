@@ -49,12 +49,13 @@ export interface Note {
   createdAt: string;
 }
 
-// Create a project (open — no token yet). Mints a fresh team token + seeds coders.
-export async function createProject(name: string, githubRepoUrl?: string): Promise<CreatedProject> {
+// Create a project (open — no token yet). Mints a fresh team token + seeds the
+// roster from `members` (the names entered at creation; SSO will replace this).
+export async function createProject(name: string, githubRepoUrl?: string, members?: string[]): Promise<CreatedProject> {
   const res = await fetch('/api/projects', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ name, githubRepoUrl: githubRepoUrl || undefined }),
+    body: JSON.stringify({ name, githubRepoUrl: githubRepoUrl || undefined, members }),
   });
   if (!res.ok) throw new Error(`Could not create project (${res.status})`);
   return res.json() as Promise<CreatedProject>;
@@ -149,12 +150,40 @@ export interface ModuleStat {
   contributors: { id: string; name: string; color: string | null; lines: number; pct: number }[];
 }
 
+export interface Breakdown {
+  name: string;
+  value: number;
+  pct: number;
+}
+
 export interface Report {
   generatedAt: string;
   coders: CoderStat[];
   modules: ModuleStat[];
   timeline: { t: string; perCoder: Record<string, number> }[];
+  languages: Breakdown[];
+  layers: Breakdown[];
+  analysisBasis: 'lines' | 'edits';
   totals: { commits: number; linesAdded: number; tasksCompleted: number; activeMinutes: number };
+}
+
+export interface Agent {
+  sessionId: string;
+  developerId: string | null;
+  developerName: string;
+  color: string | null;
+  startedAt: string;
+  lastSeenAt: string;
+  prompts: number;
+  tools: number;
+  activeMinutes: number;
+  filesTouched: number;
+  currentFile: string | null;
+  status: 'active' | 'idle' | 'away';
+}
+
+export function listAgents() {
+  return api<Agent[]>('/agents');
 }
 
 // ── Messaging + proposals ────────────────────────────────────────────────────

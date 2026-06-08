@@ -23,6 +23,16 @@ export function reportToMarkdown(r: Report): string {
     lines.push(`| ${c.name} | ${c.pct.blended}% | ${c.commits} | ${c.linesAdded} | ${c.filesTouched} | ${c.edits} | ${c.tasksCompleted} | ${c.decisions} | ${c.patterns} |`);
   }
 
+  const basis = r.analysisBasis === 'lines' ? 'lines' : 'edits';
+  if (r.languages.length) {
+    lines.push(`\n## Languages (by ${basis})\n`);
+    for (const l of r.languages) lines.push(`- ${l.name}: ${l.pct}% (${l.value} ${basis})`);
+  }
+  if (r.layers.length) {
+    lines.push(`\n## Where in the stack (by ${basis})\n`);
+    for (const l of r.layers) lines.push(`- ${l.name}: ${l.pct}% (${l.value} ${basis})`);
+  }
+
   lines.push(`\n## Module breakdown (by lines)\n`);
   for (const m of r.modules) {
     lines.push(`### ${m.name} \`${m.pathPrefix}\` — ${m.totalLines} lines`);

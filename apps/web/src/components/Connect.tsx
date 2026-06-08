@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api, type ConnectInfo, type ConnectionStatus, type User } from '../lib/api';
+import { copyText } from '../lib/clipboard';
 import { useStore } from '../store';
 
 // "Connect your agent" — shows the coder their token + exact copy-paste setup for
@@ -21,9 +22,9 @@ function CodeBlock({ text }: { text: string }) {
     <div className="codeblock">
       <pre>{text}</pre>
       <button
-        onClick={() => {
-          navigator.clipboard?.writeText(text);
-          setCopied(true);
+        onClick={async () => {
+          const ok = await copyText(text);
+          setCopied(ok);
           setTimeout(() => setCopied(false), 1500);
         }}
       >

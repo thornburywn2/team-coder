@@ -75,7 +75,8 @@ async function ingest(dev: Developer, ev: HookEventPayload): Promise<void> {
     }),
     db
       .insert(schema.sessions)
-      .values({ sessionId: ev.session_id, projectId: dev.projectId, developerId: dev.id, project })
+      // count this first event too (defaults are 0; the upsert path increments later)
+      .values({ sessionId: ev.session_id, projectId: dev.projectId, developerId: dev.id, project, promptCount: isPrompt ? 1 : 0, toolCount: isTool ? 1 : 0 })
       .onConflictDoUpdate({
         target: schema.sessions.sessionId,
         set: {

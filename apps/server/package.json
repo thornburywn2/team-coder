@@ -28,7 +28,8 @@
     "verify:audit": "bun run src/verify-audit.ts",
     "verify:collisions": "bun run src/verify-collisions.ts",
     "verify:polish": "bun run src/verify-polish.ts",
-    "verify:all": "bun run db:verify && bun run verify:ws && bun run verify:hooks && bun run verify:ownership && bun run verify:mcp && bun run verify:gitpoll && bun run verify:report && bun run verify:isolation && bun run verify:notes && bun run verify:decompose && bun run verify:proposals && bun run verify:inheritance && bun run verify:reusekit && bun run verify:capabilities && bun run verify:audit && bun run verify:collisions && bun run verify:polish"
+    "verify:extras": "bun run src/verify-extras.ts",
+    "verify:all": "bun run db:verify && bun run verify:ws && bun run verify:hooks && bun run verify:ownership && bun run verify:mcp && bun run verify:gitpoll && bun run verify:report && bun run verify:isolation && bun run verify:notes && bun run verify:decompose && bun run verify:proposals && bun run verify:inheritance && bun run verify:reusekit && bun run verify:capabilities && bun run verify:audit && bun run verify:collisions && bun run verify:polish && bun run verify:extras"
   },
   "dependencies": {
     "@team-coder/shared": "workspace:*",

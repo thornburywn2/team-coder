@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNotNull } from 'drizzle-orm';
 import { db, schema } from '../db';
 import { teamAuth, type Project } from '../auth';
 import { getConnection, getConnections } from '../connections';
@@ -68,6 +68,51 @@ apiRoutes.get('/feed', (c) => c.json(recentFeed(c.get('project').id)));
 
 // advisory concurrent-edit warnings (active, non-expired) for this project
 apiRoutes.get('/collisions', (c) => c.json(recentCollisions(c.get('project').id)));
+
+// active AGENTS — each running session (a coder may drive several at once), with
+// per-agent stats. Powers "who/which agent is active right now".
+apiRoutes.get('/agents', async (c) => {
+  const pid = c.get('project').id;
+  const since = new Date(Date.now() - 15 * 60_000); // agents seen in the last 15 min
+  const sess = await db
+    .select({ sessionId: schema.sessions.sessionId, developerId: schema.sessions.developerId, startedAt: schema.sessions.startedAt, lastSeenAt: schema.sessions.lastSeenAt, prompts: schema.sessions.promptCount, tools: schema.sessions.toolCount })
+    .from(schema.sessions)
+    .where(and(eq(schema.sessions.projectId, pid), isNotNull(schema.sessions.developerId), gte(schema.sessions.lastSeenAt, since)))
+    .orderBy(desc(schema.sessions.lastSeenAt));
+
+  const sids = sess.map((s) => s.sessionId);
+  const [people, events] = await Promise.all([
+    db.select({ id: schema.users.id, displayName: schema.users.displayName, username: schema.users.username, color: schema.users.color }).from(schema.users).where(eq(schema.users.projectId, pid)),
+    sids.length
+      ? db.select({ sessionId: schema.hookEvents.sessionId, filePath: schema.hookEvents.filePath, ts: schema.hookEvents.ts }).from(schema.hookEvents).where(and(eq(schema.hookEvents.projectId, pid), inArray(schema.hookEvents.sessionId, sids), isNotNull(schema.hookEvents.filePath)))
+      : Promise.resolve([] as { sessionId: string; filePath: string | null; ts: Date }[]),
+  ]);
+  const user = (id: string | null) => people.find((p) => p.id === id);
+  const now = Date.now();
+
+  const agents = sess.map((s) => {
+    const evs = events.filter((e) => e.sessionId === s.sessionId && e.filePath);
+    const files = new Set(evs.map((e) => e.filePath));
+    const latest = evs.reduce<{ filePath: string | null; ts: Date } | null>((a, e) => (!a || e.ts > a.ts ? e : a), null);
+    const ageMs = now - new Date(s.lastSeenAt).getTime();
+    const u = user(s.developerId);
+    return {
+      sessionId: s.sessionId,
+      developerId: s.developerId,
+      developerName: u?.displayName ?? u?.username ?? '?',
+      color: u?.color ?? null,
+      startedAt: s.startedAt,
+      lastSeenAt: s.lastSeenAt,
+      prompts: s.prompts,
+      tools: s.tools,
+      activeMinutes: Math.max(0, Math.round((new Date(s.lastSeenAt).getTime() - new Date(s.startedAt).getTime()) / 60000)),
+      filesTouched: files.size,
+      currentFile: latest?.filePath ?? null,
+      status: ageMs < 90_000 ? 'active' : ageMs < 5 * 60_000 ? 'idle' : 'away',
+    };
+  });
+  return c.json(agents);
+});
 
 apiRoutes.get('/presence', async (c) =>
   c.json(await db.select().from(schema.userPresence).where(eq(schema.userPresence.projectId, c.get('project').id))),

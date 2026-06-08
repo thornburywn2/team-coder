@@ -1,6 +1,26 @@
 import { useQuery } from '@tanstack/react-query';
-import { api, type Report as ReportData } from '../lib/api';
+import { api, type Breakdown, type Report as ReportData } from '../lib/api';
 import { downloadFile, reportToMarkdown } from '../lib/report-export';
+
+const PALETTE = ['#5b8cff', '#3cb44b', '#f5a623', '#e6194B', '#911eb4', '#42d4f4', '#f032e6', '#bfef45', '#fabed4', '#469990'];
+
+function BreakdownBars({ title, hint, items, unit }: { title: string; hint: string; items: Breakdown[]; unit: string }) {
+  return (
+    <section className="panel">
+      <h2>{title} <span className="muted small">{hint}</span></h2>
+      {items.length === 0 && <p className="muted small">No data yet.</p>}
+      <div className="breakdown">
+        {items.map((b, i) => (
+          <div key={b.name} className="bd-row">
+            <span className="bd-name">{b.name}</span>
+            <div className="bar"><div style={{ width: `${b.pct}%`, background: PALETTE[i % PALETTE.length] }} /></div>
+            <span className="bd-val">{b.pct}% <span className="muted">({b.value.toLocaleString()} {unit})</span></span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 // Post-hackathon contribution report. Multiple fairness lenses (blended headline),
 // module breakdown by LOC, activity timeline. Exportable (JSON/Markdown/print).
@@ -64,6 +84,11 @@ export function Report() {
           ))}
         </div>
       </section>
+
+      <div className="report-cols">
+        <BreakdownBars title="Languages" hint={report.analysisBasis === 'lines' ? 'by lines' : 'by edits'} items={report.languages} unit={report.analysisBasis} />
+        <BreakdownBars title="Where in the stack" hint={`${report.analysisBasis === 'lines' ? 'by lines' : 'by edits'} · frontend / backend / database / infra / docs`} items={report.layers} unit={report.analysisBasis} />
+      </div>
 
       <section className="panel">
         <h2>Module breakdown <span className="muted small">by lines committed</span></h2>
