@@ -167,11 +167,34 @@ export interface Proposal {
   status: ProposalStatus;
   authorId: string | null;
   experimentBranch: string | null;
+  codeSnippet: string | null;
+  language: string | null;
   createdAt: string;
   updatedAt: string;
   tally: { approve: number; reject: number; abstain: number };
   votes: { voterId: string; vote: VoteValue }[];
   commentCount: number;
+}
+
+export interface Pattern {
+  id: string;
+  title: string;
+  description: string | null;
+  codeSnippet: string;
+  language: string | null;
+  tags: string[];
+  authorId: string | null;
+  createdAt: string;
+}
+
+export function listPatterns() {
+  return api<Pattern[]>('/patterns');
+}
+export function createPattern(p: { title: string; code: string; description?: string; language?: string; tags?: string[] }, authorId?: string | null) {
+  return api<Pattern>('/patterns', { method: 'POST', body: JSON.stringify({ ...p, authorId }) });
+}
+export function deletePattern(id: string) {
+  return api(`/patterns/${id}`, { method: 'DELETE' });
 }
 
 export interface Decision {
@@ -195,14 +218,14 @@ export interface Comment {
   createdAt: string;
 }
 
-export function createProposal(p: { title: string; description?: string; experimentBranch?: string }, authorId?: string | null) {
+export function createProposal(p: { title: string; description?: string; experimentBranch?: string; codeSnippet?: string; language?: string }, authorId?: string | null) {
   return api<Proposal>('/proposals', { method: 'POST', body: JSON.stringify({ ...p, authorId }) });
 }
 export function voteProposal(id: string, vote: VoteValue, voterId: string | null) {
   return api(`/proposals/${id}/vote`, { method: 'POST', body: JSON.stringify({ vote, voterId }) });
 }
 export function setProposalStatus(id: string, status: ProposalStatus, actorId: string | null) {
-  return api<Proposal & { adopted?: { tasks: number; adr: boolean } }>(`/proposals/${id}/status`, { method: 'POST', body: JSON.stringify({ status, actorId }) });
+  return api<Proposal & { adopted?: { tasks: number; adr: boolean; pattern: boolean } }>(`/proposals/${id}/status`, { method: 'POST', body: JSON.stringify({ status, actorId }) });
 }
 export function listComments(targetType: string, targetId: string) {
   return api<Comment[]>(`/comments?targetType=${targetType}&targetId=${targetId}`);

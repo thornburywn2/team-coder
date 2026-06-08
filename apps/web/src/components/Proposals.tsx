@@ -25,16 +25,20 @@ function NewProposal({ meId }: { meId: string | null }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [branch, setBranch] = useState('');
+  const [code, setCode] = useState('');
+  const [language, setLanguage] = useState('');
   const create = useMutation({
-    mutationFn: () => createProposal({ title: title.trim(), description: description.trim() || undefined, experimentBranch: branch.trim() || undefined }, meId),
-    onSuccess: () => { setTitle(''); setDescription(''); setBranch(''); setOpen(false); queryClient.invalidateQueries({ queryKey: ['proposals'] }); },
+    mutationFn: () => createProposal({ title: title.trim(), description: description.trim() || undefined, experimentBranch: branch.trim() || undefined, codeSnippet: code.trim() || undefined, language: language.trim() || undefined }, meId),
+    onSuccess: () => { setTitle(''); setDescription(''); setBranch(''); setCode(''); setLanguage(''); setOpen(false); queryClient.invalidateQueries({ queryKey: ['proposals'] }); },
   });
   if (!open) return <button className="gen-btn" onClick={() => setOpen(true)}>+ New proposal</button>;
   return (
     <form className="new-proposal panel" onSubmit={(e) => { e.preventDefault(); if (title.trim()) create.mutate(); }}>
       <input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Proposal title (the idea / change)" />
-      <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Why? What changes? (optional)" />
+      <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Why? What changes? Use a checklist for adoption tasks. (optional)" />
       <input value={branch} onChange={(e) => setBranch(e.target.value)} placeholder="experiment branch (optional, e.g. exp/new-router)" />
+      <textarea value={code} onChange={(e) => setCode(e.target.value)} rows={4} placeholder="reference implementation — published to the reuse kit on adoption (optional)" />
+      {code.trim() && <input value={language} onChange={(e) => setLanguage(e.target.value)} placeholder="language for the snippet (e.g. ts)" />}
       <div className="prd-actions">
         <button className="primary" disabled={!title.trim() || create.isPending}>{create.isPending ? 'Posting…' : 'Post proposal'}</button>
         <button type="button" className="link-btn" onClick={() => setOpen(false)}>cancel</button>
@@ -45,14 +49,18 @@ function NewProposal({ meId }: { meId: string | null }) {
 
 function Card({ p, users, meId }: { p: Proposal; users: User[]; meId: string | null }) {
   const [showThread, setShowThread] = useState(false);
-  const [adopted, setAdopted] = useState<number | null>(null);
+  const [adopted, setAdopted] = useState<{ tasks: number; pattern: boolean } | null>(null);
   const author = users.find((u) => u.id === p.authorId);
   const myVote = p.votes.find((v) => v.voterId === meId)?.vote;
   const vote = useMutation({ mutationFn: (v: VoteValue) => voteProposal(p.id, v, meId), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['proposals'] }) });
   const status = useMutation({
     mutationFn: (s: ProposalStatus) => setProposalStatus(p.id, s, meId),
     onSuccess: (res) => {
-      if (res.adopted) { setAdopted(res.adopted.tasks); queryClient.invalidateQueries({ queryKey: ['decisions'] }); }
+      if (res.adopted) {
+        setAdopted({ tasks: res.adopted.tasks, pattern: res.adopted.pattern });
+        queryClient.invalidateQueries({ queryKey: ['decisions'] });
+        if (res.adopted.pattern) queryClient.invalidateQueries({ queryKey: ['patterns'] });
+      }
       queryClient.invalidateQueries({ queryKey: ['proposals'] });
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
     },
@@ -67,6 +75,7 @@ function Card({ p, users, meId }: { p: Proposal; users: User[]; meId: string | n
       </div>
       {p.description && <p className="prop-desc">{p.description}</p>}
       {p.experimentBranch && <code className="prop-branch">⎇ {p.experimentBranch}</code>}
+      {p.codeSnippet && <pre className="prop-code">{p.codeSnippet}</pre>}
       <div className="prop-votes">
         {VOTES.map(({ v, label }) => (
           <button key={v} className={`vote-btn ${myVote === v ? 'mine' : ''}`} disabled={vote.isPending} onClick={() => vote.mutate(v)}>
@@ -74,7 +83,7 @@ function Card({ p, users, meId }: { p: Proposal; users: User[]; meId: string | n
           </button>
         ))}
       </div>
-      {adopted !== null && <p className="adopted-note">✓ Adopted — created {adopted} task{adopted === 1 ? '' : 's'} on the board.</p>}
+      {adopted !== null && <p className="adopted-note">✓ Adopted — created {adopted.tasks} task{adopted.tasks === 1 ? '' : 's'}{adopted.pattern ? ' + published a reuse-kit pattern' : ''}.</p>}
       <div className="prop-actions">
         <button className="link-btn" onClick={() => setShowThread((s) => !s)}>💬 {p.commentCount} {showThread ? '▾' : '▸'}</button>
         {p.status === 'open' && (

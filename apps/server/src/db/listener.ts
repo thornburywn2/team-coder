@@ -63,6 +63,11 @@ async function toMessage(n: Notification): Promise<WsMessage | null> {
       const [row] = await db.select().from(schema.votes).where(eq(schema.votes.id, n.id));
       return row ? { type: 'VOTE_CAST', payload: { proposalId: row.proposalId }, meta: { projectId: row.projectId ?? undefined } } : null;
     }
+    case 'code_patterns': {
+      if (n.op === 'DELETE') return null;
+      const [row] = await db.select().from(schema.codePatterns).where(eq(schema.codePatterns.id, n.id));
+      return row ? { type: 'PATTERN_ADDED', payload: row, meta: { projectId: row.projectId ?? undefined } } : null;
+    }
     default:
       return null; // modules handled in later phases
   }

@@ -212,11 +212,11 @@ export function createMcpServer(dev: Developer): McpServer {
   server.registerTool(
     'create_proposal',
     {
-      description: 'Raise a design proposal / idea for the team to vote on. Optionally tie it to an experiment branch (prove-then-inherit).',
-      inputSchema: { title: z.string(), description: z.string().optional(), experiment_branch: z.string().optional() },
+      description: 'Raise a design proposal / idea for the team to vote on. Optionally tie it to an experiment branch and include a reference implementation (code_snippet) — on adoption it is published to the shared pattern library (prove-then-inherit).',
+      inputSchema: { title: z.string(), description: z.string().optional(), experiment_branch: z.string().optional(), code_snippet: z.string().optional(), language: z.string().optional() },
     },
-    async ({ title, description, experiment_branch }) => {
-      const [row] = await db.insert(schema.proposals).values({ projectId: pid, title, description: description ?? null, experimentBranch: experiment_branch ?? null, authorId: dev.id, status: 'open' }).returning({ id: schema.proposals.id, title: schema.proposals.title });
+    async ({ title, description, experiment_branch, code_snippet, language }) => {
+      const [row] = await db.insert(schema.proposals).values({ projectId: pid, title, description: description ?? null, experimentBranch: experiment_branch ?? null, codeSnippet: code_snippet ?? null, language: language ?? null, authorId: dev.id, status: 'open' }).returning({ id: schema.proposals.id, title: schema.proposals.title });
       pushFeed(pid, { ...feedBase, kind: 'proposal', detail: `proposed "${row!.title}"` });
       return text({ ok: true, proposal: row });
     },

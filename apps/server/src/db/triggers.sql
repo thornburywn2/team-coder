@@ -64,3 +64,7 @@ CREATE TRIGGER trg_presence_change AFTER INSERT OR UPDATE OR DELETE ON user_pres
 DROP TRIGGER IF EXISTS trg_notes_change ON project_notes;
 CREATE TRIGGER trg_notes_change AFTER INSERT OR UPDATE OR DELETE ON project_notes
   FOR EACH ROW EXECUTE FUNCTION notify_record_change('id');
+
+DROP TRIGGER IF EXISTS trg_code_patterns_change ON code_patterns;
+CREATE TRIGGER trg_code_patterns_change AFTER INSERT OR UPDATE OR DELETE ON code_patterns
+  FOR EACH ROW EXECUTE FUNCTION notify_record_change('id');

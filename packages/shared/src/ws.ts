@@ -15,6 +15,7 @@ export const WS_SERVER_MSG = [
   'VOTE_CAST', // a vote landed on a proposal (payload: { proposalId })
   'COMMENT_ADDED', // a comment was posted on a task or proposal
   'NOTE_ADDED', // a project note was posted (project_notes insert)
+  'PATTERN_ADDED', // a reusable code pattern was published to the kit
 ] as const;
 export type WsServerMsgType = (typeof WS_SERVER_MSG)[number];
 

@@ -13,12 +13,13 @@ import { Notes } from './Notes';
 import { Tasks } from './Tasks';
 import { Report } from './Report';
 import { Proposals } from './Proposals';
+import { Patterns } from './Patterns';
 import { Connect } from './Connect';
 
 export function Dashboard() {
   const { token, connected, setConnected, hydratePresence, applyPresence, hydrateFeed, pushFeed, setOwnership, logout } =
     useStore();
-  const [view, setView] = useState<'board' | 'proposals' | 'report' | 'connect'>('board');
+  const [view, setView] = useState<'board' | 'proposals' | 'patterns' | 'report' | 'connect'>('board');
   const { data: project } = useQuery({ queryKey: ['project'], queryFn: () => api<ProjectInfo>('/projects/current') });
 
   useEffect(() => {
@@ -48,6 +49,9 @@ export function Dashboard() {
         case 'NOTE_ADDED':
           void queryClient.invalidateQueries({ queryKey: ['notes'] });
           break;
+        case 'PATTERN_ADDED':
+          void queryClient.invalidateQueries({ queryKey: ['patterns'] });
+          break;
         case 'PROPOSAL_UPDATED':
         case 'VOTE_CAST':
           void queryClient.invalidateQueries({ queryKey: ['proposals'] });
@@ -76,6 +80,7 @@ export function Dashboard() {
         <nav className="view-tabs">
           <button className={view === 'board' ? 'active' : ''} onClick={() => setView('board')}>Board</button>
           <button className={view === 'proposals' ? 'active' : ''} onClick={() => setView('proposals')}>Proposals</button>
+          <button className={view === 'patterns' ? 'active' : ''} onClick={() => setView('patterns')}>Reuse kit</button>
           <button className={view === 'report' ? 'active' : ''} onClick={() => setView('report')}>Report</button>
           <button className={view === 'connect' ? 'active' : ''} onClick={() => setView('connect')}>Connect agent</button>
         </nav>
@@ -96,6 +101,8 @@ export function Dashboard() {
         </main>
       ) : view === 'proposals' ? (
         <Proposals />
+      ) : view === 'patterns' ? (
+        <Patterns />
       ) : view === 'report' ? (
         <Report />
       ) : (

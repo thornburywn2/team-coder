@@ -130,6 +130,10 @@ export const proposals = pgTable('proposals', {
   status: proposalStatus('status').notNull().default('open'),
   authorId: uuid('author_id').references(() => users.id, { onDelete: 'set null' }),
   experimentBranch: varchar('experiment_branch', { length: 255 }),
+  // optional reference implementation proven on the experiment branch — on adoption
+  // it's published to the shared pattern library (prove-then-inherit / reuse-kit).
+  codeSnippet: text('code_snippet'),
+  language: varchar('language', { length: 50 }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

@@ -43,11 +43,11 @@ proposalRoutes.get('/', async (c) => {
 
 proposalRoutes.post('/', async (c) => {
   const project = c.get('project');
-  const body = (await c.req.json().catch(() => ({}))) as { title?: string; description?: string; experimentBranch?: string; authorId?: string };
+  const body = (await c.req.json().catch(() => ({}))) as { title?: string; description?: string; experimentBranch?: string; authorId?: string; codeSnippet?: string; language?: string };
   if (!body.title?.trim()) return c.json({ error: 'title required' }, 400);
   const [row] = await db
     .insert(schema.proposals)
-    .values({ projectId: project.id, title: body.title.trim(), description: body.description?.trim() || null, experimentBranch: body.experimentBranch?.trim() || null, authorId: body.authorId ?? null, status: 'open' })
+    .values({ projectId: project.id, title: body.title.trim(), description: body.description?.trim() || null, experimentBranch: body.experimentBranch?.trim() || null, codeSnippet: body.codeSnippet?.trim() || null, language: body.language?.trim() || null, authorId: body.authorId ?? null, status: 'open' })
     .returning();
   const u = await actorName(project.id, body.authorId);
   pushFeed(project.id, { developerId: u?.id, developer: u?.displayName ?? u?.username, color: u?.color ?? undefined, kind: 'proposal', detail: `proposed "${row!.title}"` });
@@ -76,7 +76,7 @@ proposalRoutes.post('/:id/vote', async (c) => {
 // Implementation steps are derived from the proposal description with the same
 // decomposer used for PRDs (structured description → tasks; prose → one "Adopt"
 // task), and the decision is recorded as an ADR so it isn't relitigated.
-async function adopt(projectId: string, proposal: { id: string; title: string; description: string | null }, actorId: string | undefined) {
+async function adopt(projectId: string, proposal: { id: string; title: string; description: string | null; codeSnippet: string | null; language: string | null }, actorId: string | undefined) {
   const mods = await db
     .select({ id: schema.modules.id, name: schema.modules.name, pathPrefix: schema.modules.pathPrefix })
     .from(schema.modules)
@@ -95,7 +95,23 @@ async function adopt(projectId: string, proposal: { id: string; title: string; d
     status: 'accepted',
     authorId: actorId ?? null,
   });
-  return { tasks: tasks.length, adr: true };
+
+  // prove-then-inherit: if the proposal carried a reference implementation,
+  // publish it to the shared pattern library so the team can reuse it.
+  let pattern = false;
+  if (proposal.codeSnippet?.trim()) {
+    await db.insert(schema.codePatterns).values({
+      projectId,
+      title: proposal.title,
+      description: `Adopted from proposal "${proposal.title}".`,
+      codeSnippet: proposal.codeSnippet,
+      language: proposal.language ?? null,
+      tags: ['adopted'],
+      authorId: actorId ?? null,
+    });
+    pattern = true;
+  }
+  return { tasks: tasks.length, adr: true, pattern };
 }
 
 // move a proposal's status (accept / reject / withdraw). Accepting triggers
@@ -107,7 +123,7 @@ proposalRoutes.post('/:id/status', async (c) => {
   if (!body.status || !PROPOSAL_STATUS.includes(body.status as never)) return c.json({ error: 'invalid status' }, 400);
 
   const [prev] = await db
-    .select({ id: schema.proposals.id, title: schema.proposals.title, description: schema.proposals.description, status: schema.proposals.status })
+    .select({ id: schema.proposals.id, title: schema.proposals.title, description: schema.proposals.description, status: schema.proposals.status, codeSnippet: schema.proposals.codeSnippet, language: schema.proposals.language })
     .from(schema.proposals)
     .where(and(eq(schema.proposals.id, id), eq(schema.proposals.projectId, project.id)));
   if (!prev) return c.json({ error: 'proposal not found' }, 404);
@@ -122,7 +138,7 @@ proposalRoutes.post('/:id/status', async (c) => {
   const base = { developerId: u?.id, developer: u?.displayName ?? u?.username, color: u?.color ?? undefined };
 
   // adopt only on the transition into 'accepted' (idempotent — never twice)
-  let adopted: { tasks: number; adr: boolean } | undefined;
+  let adopted: { tasks: number; adr: boolean; pattern: boolean } | undefined;
   if (body.status === 'accepted' && prev.status !== 'accepted') {
     adopted = await adopt(project.id, prev, body.actorId);
     pushFeed(project.id, { ...base, kind: 'proposal', detail: `adopted "${row!.title}" → ${adopted.tasks} task${adopted.tasks === 1 ? '' : 's'}` });

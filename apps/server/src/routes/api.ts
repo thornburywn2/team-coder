@@ -10,6 +10,7 @@ import { decomposePrd } from '../lib/decompose';
 import { taskRoutes } from './tasks';
 import { proposalRoutes } from './proposals';
 import { commentRoutes } from './comments';
+import { patternRoutes } from './patterns';
 
 // Human portal REST. Read endpoints for initial hydration; the WebSocket keeps
 // the client hot after load. All gated by a project's team token, which teamAuth
@@ -121,6 +122,7 @@ apiRoutes.route('/tasks', taskRoutes);
 // proposals (design-evolution channel + voting) and comments (anchored threads)
 apiRoutes.route('/proposals', proposalRoutes);
 apiRoutes.route('/comments', commentRoutes);
+apiRoutes.route('/patterns', patternRoutes); // reuse-kit: shared code patterns
 
 // decisions of record (ADRs) — captured when proposals are adopted, so the team
 // doesn't relitigate. Newest first.
