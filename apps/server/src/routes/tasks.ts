@@ -54,6 +54,27 @@ taskRoutes.post('/', async (c) => {
   return c.json(row, 201);
 });
 
+// edit task metadata: status, priority, tags, due date, title/description.
+// Setting status manages completed_at so the burndown stays accurate.
+taskRoutes.patch('/:id', async (c) => {
+  const project = c.get('project');
+  const id = c.req.param('id');
+  const body = (await c.req.json().catch(() => ({}))) as {
+    title?: string; description?: string; status?: 'todo' | 'in_progress' | 'in_review' | 'done' | 'blocked';
+    priority?: 'low' | 'medium' | 'high' | 'urgent'; tags?: string[]; dueDate?: string | null;
+  };
+  const patch: Record<string, unknown> = { updatedAt: new Date() };
+  if (typeof body.title === 'string' && body.title.trim()) patch['title'] = body.title.trim();
+  if (body.description !== undefined) patch['description'] = body.description ?? null;
+  if (body.priority) patch['priority'] = body.priority;
+  if (Array.isArray(body.tags)) patch['tags'] = body.tags;
+  if (body.dueDate !== undefined) patch['dueDate'] = body.dueDate ? new Date(body.dueDate) : null;
+  if (body.status) { patch['status'] = body.status; patch['completedAt'] = body.status === 'done' ? new Date() : null; }
+  const [row] = await db.update(schema.tasks).set(patch).where(and(eq(schema.tasks.id, id), eq(schema.tasks.projectId, project.id))).returning();
+  if (!row) return c.json({ error: 'task not found' }, 404);
+  return c.json(row);
+});
+
 // Bulk-create tasks from PRD decomposition (marked source='prd' so the board can
 // measure progress against the stated goal). The DB trigger broadcasts each new
 // row, so the board updates live without extra plumbing.

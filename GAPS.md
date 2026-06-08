@@ -104,16 +104,21 @@ trust) · 🟢 low (polish / nice-to-have).
 - 🟡 Structured logging/metrics/error-tracking still minimal (request logging +
   /health only). *(observability stack left for a later pass.)*
 
-## 9. Product / management surfaces (missing screens)
-- 🟡 **No team management after creation** — can't add/remove coders, rename, edit
-  emails, or **regenerate/revoke tokens** from the UI.
-- 🟡 **No project settings** (rename, change repo URL, archive/delete) and **no
-  in-app project switcher** — you sign out and re-enter a token to switch.
-- 🟡 **No notifications** (assigned to you, your proposal resolved) beyond the feed.
-- 🟢 **Task UX gaps**: no due-date entry (column exists, no input), no priority/tag
-  editing in the UI, no subtasks/dependencies, no drag-between-statuses.
-- 🟢 **Accessibility**: detail is in `title=` tooltips (not keyboard/screen-reader
-  friendly); status is color-coded with no ARIA; interactive widgets lack roles.
+## 9. Product / management surfaces — ✅ RESOLVED (2026-06-08)
+- ✅ **Team management** (Settings, in the Connect tab): add/edit/remove coders, set
+  login + git emails, **rotate/revoke** each coder's agent token.
+- ✅ **Project settings**: rename, change repo URL, toggle git-poll, **archive**, and
+  **rotate the team token**.
+- ✅ **In-app project switcher** — known projects are remembered; a header dropdown
+  hops between them without re-entering tokens.
+- ✅ **Notifications** — the Activity feed has a "for me" filter (your activity +
+  mentions) and highlights your items; `aria-live` for screen readers.
+- ✅ **Task UX** — inline **status**, **priority**, and **due-date** editing in the
+  task list (REST `PATCH /api/tasks/:id`, completed_at managed).
+- ✅ **Accessibility pass** — ARIA labels on icon/select/inputs, `aria-live` feed,
+  status shown as text (not color-only).
+- 🟢 Subtasks/dependencies + drag-between-statuses remain (re-statusing is done via
+  the inline status select). *(nice-to-have, deferred.)*
 
 ## 10. Agent-integration coverage — ✅ RESOLVED (2026-06-08)
 - ✅ **Subagents distinguished.** `/api/agents` now counts distinct `agent_id`s per

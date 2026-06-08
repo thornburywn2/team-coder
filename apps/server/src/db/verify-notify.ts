@@ -9,14 +9,22 @@ const listener = postgres(DATABASE_URL, { max: 1 });
 const writer = postgres(DATABASE_URL, { max: 1 });
 
 async function main(): Promise<boolean> {
-  let received: string | null = null;
+  let matched: { op: string; table: string; id: string } | null = null;
+  let targetId = '';
 
+  // resolve only when we see OUR task's notification — other NOTIFYs (a busy shared
+  // DB: git-poll, idle, etc.) are ignored instead of clobbering the captured one.
   const got = new Promise<void>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('timeout: no NOTIFY in 5s')), 5000);
+    const timeout = setTimeout(() => reject(new Error('timeout: no matching NOTIFY in 5s')), 5000);
     listener.listen('db_notifications', (payload) => {
-      received = payload;
-      clearTimeout(timeout);
-      resolve();
+      try {
+        const p = JSON.parse(payload) as { op: string; table: string; id: string };
+        if (p.table === 'tasks' && p.op === 'INSERT' && p.id === targetId) {
+          matched = p;
+          clearTimeout(timeout);
+          resolve();
+        }
+      } catch { /* ignore non-JSON */ }
     });
   });
 
@@ -26,15 +34,15 @@ async function main(): Promise<boolean> {
   const [row] = await writer<{ id: string }[]>`
     INSERT INTO tasks (title) VALUES ('notify round-trip probe') RETURNING id
   `;
+  targetId = row!.id;
   console.log('[verify] inserted task', row!.id);
 
   await got;
-  console.log('[verify] received payload:', received);
+  console.log('[verify] received payload:', JSON.stringify(matched));
 
   await writer`DELETE FROM tasks WHERE id = ${row!.id}`;
 
-  const parsed = JSON.parse(received!) as { op: string; table: string; id: string };
-  return parsed.table === 'tasks' && parsed.op === 'INSERT' && parsed.id === row!.id;
+  return !!matched && matched.table === 'tasks' && matched.op === 'INSERT' && matched.id === row!.id;
 }
 
 let ok = false;

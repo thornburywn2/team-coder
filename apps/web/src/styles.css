@@ -446,3 +446,29 @@ main { display: grid; grid-template-columns: 1fr 360px; gap: 1rem; align-items: 
 .note-head .who { font-weight: 600; }
 .note-head .time { margin-left: auto; color: var(--gray); font-size: 0.7rem; }
 .note-body { margin: 0.3rem 0 0; font-size: 0.85rem; color: var(--text); word-break: break-word; white-space: pre-wrap; }
+
+/* settings (in Connect) */
+.settings .settings-block { border-top: 1px solid var(--border); padding-top: 0.8rem; margin-top: 0.8rem; }
+.settings h3 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+.settings label { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; font-size: 0.85rem; color: var(--muted); }
+.settings label input { flex: 1; }
+.settings input { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.35rem 0.5rem; }
+.settings-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-top: 0.4rem; }
+.settings-note { font-size: 0.8rem; margin-top: 0.4rem; }
+.settings-note code { background: var(--panel-2); padding: 0.1rem 0.35rem; border-radius: 4px; word-break: break-all; }
+.settings-team { list-style: none; margin: 0; padding: 0; }
+.settings-member { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; padding: 0.4rem 0; border-top: 1px solid var(--border); font-size: 0.82rem; }
+.settings-member .who { min-width: 120px; display: flex; align-items: center; gap: 0.3rem; }
+.settings-member input { flex: 1; min-width: 120px; }
+.btn.danger, .danger { color: #ff6b6b; }
+/* project switcher */
+.proj-switch { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.2rem 0.4rem; font-size: 0.8rem; }
+
+/* feed for-me toggle + highlight */
+.feed-toggle { float: right; font-weight: 400; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; }
+.feed-mine { background: rgba(91,140,255,0.08); border-radius: 6px; }
+
+/* inline task editing */
+.task-status, .task-prio { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0.1rem 0.3rem; font-size: 0.72rem; }
+.task-prio.prio-urgent { color: #ff6b6b; } .task-prio.prio-high { color: var(--amber); } .task-prio.prio-low { color: var(--muted); }
+.task-due { background: var(--panel-2); color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 0.05rem 0.25rem; font-size: 0.7rem; width: 7.5rem; }

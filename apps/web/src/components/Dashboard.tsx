@@ -5,6 +5,7 @@ import { api, type CollisionWarning, type FeedItem, type ModuleOwnership, type P
 import { queryClient } from '../lib/query';
 import { connectSocket, onMessage } from '../lib/socket';
 import { useStore } from '../store';
+import { knownProjects, rememberProject, switchProject } from '../lib/projects';
 import { Board } from './Board';
 import { ProjectHeader } from './ProjectHeader';
 import { Collisions } from './Collisions';
@@ -38,6 +39,8 @@ export function Dashboard() {
   useEffect(() => {
     if (roster && meId && !roster.some((u) => u.id === meId)) logout();
   }, [roster, meId, logout]);
+  // remember this project for the in-app switcher
+  useEffect(() => { if (token && project?.name) rememberProject(token, project.name); }, [token, project?.name]);
 
   useEffect(() => {
     if (!token) return;
@@ -104,6 +107,17 @@ export function Dashboard() {
       <header>
         <h1>Team Coder</h1>
         {project && <span className="project-chip">{project.name}</span>}
+        {knownProjects().length > 1 && (
+          <select
+            className="proj-switch"
+            aria-label="Switch project"
+            value={token ?? ''}
+            onChange={(e) => { if (e.target.value && e.target.value !== token) switchProject(e.target.value); }}
+            title="Switch project"
+          >
+            {knownProjects().map((p) => <option key={p.token} value={p.token}>{p.name}</option>)}
+          </select>
+        )}
         <span className={`conn ${connected ? 'on' : 'off'}`}>{connected ? 'live' : 'connecting…'}</span>
         <nav className="view-tabs">
           <button className={view === 'board' ? 'active' : ''} onClick={() => setView('board')}>Board</button>

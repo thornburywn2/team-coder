@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api, type ConnectInfo, type ConnectionStatus, type User } from '../lib/api';
 import { copyText } from '../lib/clipboard';
 import { useStore } from '../store';
+import { Settings } from './Settings';
 
 // "Connect your agent" — shows the coder their token + exact copy-paste setup for
 // the MCP server and hooks (pointed at whatever host the portal is served from),
@@ -146,6 +147,7 @@ finish with complete_task. Check get_shared_patterns before building from scratc
           })}
         </ul>
       </section>
+      <Settings />
     </div>
   );
 }

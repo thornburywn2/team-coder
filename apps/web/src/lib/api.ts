@@ -31,6 +31,23 @@ export interface ProjectInfo {
   prd: string | null;
 }
 
+// ── Team + project management (Settings) ──────────────────────────────────
+export interface TeamMember { id: string; username: string; displayName: string | null; email: string | null; gitEmails: string[]; color: string | null; agentToken: string }
+export function getTeam() { return api<TeamMember[]>('/team'); }
+export function addMember(displayName: string, email?: string) {
+  return api<{ id: string; username: string; displayName: string | null; agentToken: string }>('/team/members', { method: 'POST', body: JSON.stringify({ displayName, email }) });
+}
+export function editMember(id: string, patch: { displayName?: string; email?: string | null; gitEmails?: string[]; color?: string }) {
+  return api<{ ok: boolean }>(`/team/members/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
+}
+export function removeMember(id: string) { return api<{ ok: boolean }>(`/team/members/${id}`, { method: 'DELETE' }); }
+export function rotateMemberToken(id: string) { return api<{ agentToken: string }>(`/team/members/${id}/rotate-token`, { method: 'POST' }); }
+export function patchProject(patch: { name?: string; githubRepoUrl?: string | null; gitPollEnabled?: boolean }) {
+  return api<{ ok: boolean }>('/projects/current', { method: 'PATCH', body: JSON.stringify(patch) });
+}
+export function rotateTeamToken() { return api<{ token: string }>('/projects/current/rotate-token', { method: 'POST' }); }
+export function archiveProject() { return api<{ ok: boolean }>('/projects/current/archive', { method: 'POST' }); }
+
 // returned once by POST /api/projects — the token is shown to the creator
 export interface CreatedProject {
   id: string;

@@ -30,6 +30,12 @@ export function Tasks() {
     mutationFn: (id: string) => api<Task>(`/tasks/${id}/done`, { method: 'POST', body: JSON.stringify({ userId: meId }) }),
     onSuccess: invalidate,
   });
+  const edit = useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Record<string, unknown> }) => api<Task>(`/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    onSuccess: () => { invalidate(); queryClient.invalidateQueries({ queryKey: ['summary'] }); queryClient.invalidateQueries({ queryKey: ['burndown'] }); },
+  });
+  const PRIOS = ['low', 'medium', 'high', 'urgent'] as const;
+  const STATUSES = ['todo', 'in_progress', 'in_review', 'blocked', 'done'] as const;
 
   const doneCount = tasks.filter((t) => t.status === 'done').length;
   const pct = tasks.length ? Math.round((doneCount / tasks.length) * 100) : 0;
@@ -63,10 +69,14 @@ export function Tasks() {
           return (
             <li key={t.id} className={`task task-${t.status}`}>
               <div className="task-row" title={tip}>
-                <span className={`badge ${t.status}`}>{t.status.replace('_', ' ')}</span>
+                <select className={`task-status badge ${t.status}`} value={t.status} aria-label="task status" onChange={(e) => edit.mutate({ id: t.id, patch: { status: e.target.value } })}>
+                  {STATUSES.map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+                </select>
                 {t.source === 'prd' && <span className="goal-tag" title="from the project goal (PRD)">🎯</span>}
                 {t.source === 'proposal' && <span className="goal-tag" title="from an adopted proposal">💡</span>}
-                {t.priority !== 'medium' && <span className={`prio prio-${t.priority}`} title={`${t.priority} priority`}>{t.priority}</span>}
+                <select className={`task-prio prio-${t.priority}`} value={t.priority} aria-label="task priority" onChange={(e) => edit.mutate({ id: t.id, patch: { priority: e.target.value } })}>
+                  {PRIOS.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
                 <span className="task-title">{t.title}</span>
                 {t.tags?.map((tag) => <span key={tag} className="task-tag">{tag}</span>)}
                 {owner && (
@@ -76,7 +86,8 @@ export function Tasks() {
                   </span>
                 )}
                 <span className="task-actions">
-                  <button onClick={() => setOpenThread(open ? null : t.id)}>💬</button>
+                  <input type="date" className="task-due" aria-label="due date" title="Due date" value={t.dueDate ? t.dueDate.slice(0, 10) : ''} onChange={(e) => edit.mutate({ id: t.id, patch: { dueDate: e.target.value || null } })} />
+                  <button onClick={() => setOpenThread(open ? null : t.id)} aria-label="discuss">💬</button>
                   {t.status !== 'done' && (
                     <>
                       <button onClick={() => claim.mutate(t.id)}>Claim</button>
