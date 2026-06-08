@@ -171,6 +171,96 @@ apiRoutes.post('/attribution/map', async (c) => {
   return c.json({ ok: true, backfilled: claimed.length });
 });
 
+// ── Project + team management (team-token gated — a member can manage their project) ──
+const MGMT_COLORS = ['#e6194B', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6', '#bfef45', '#fabed4', '#469990'];
+
+// update project settings: name, repo URL, per-project git-poll toggle
+apiRoutes.patch('/projects/current', async (c) => {
+  const project = c.get('project');
+  const body = (await c.req.json().catch(() => ({}))) as { name?: string; githubRepoUrl?: string | null; gitPollEnabled?: boolean };
+  const patch: Record<string, unknown> = {};
+  if (typeof body.name === 'string' && body.name.trim()) patch['name'] = body.name.trim().slice(0, 120);
+  if (body.githubRepoUrl !== undefined) patch['githubRepoUrl'] = body.githubRepoUrl?.trim() || null;
+  if (typeof body.gitPollEnabled === 'boolean') patch['gitPollEnabled'] = body.gitPollEnabled;
+  if (Object.keys(patch).length === 0) return c.json({ error: 'nothing to update' }, 400);
+  await db.update(schema.projects).set(patch).where(eq(schema.projects.id, project.id));
+  return c.json({ ok: true });
+});
+
+// rotate the project's team token (invalidates the old one for everyone)
+apiRoutes.post('/projects/current/rotate-token', async (c) => {
+  const project = c.get('project');
+  const token = `tc-${crypto.randomUUID()}`;
+  await db.update(schema.projects).set({ token }).where(eq(schema.projects.id, project.id));
+  return c.json({ token });
+});
+
+// archive (soft) the project — hides it from active lists; data is retained
+apiRoutes.post('/projects/current/archive', async (c) => {
+  const project = c.get('project');
+  await db.update(schema.projects).set({ archivedAt: new Date() }).where(eq(schema.projects.id, project.id));
+  return c.json({ ok: true });
+});
+
+// team roster WITH agent tokens (for onboarding/management within the team)
+apiRoutes.get('/team', async (c) => {
+  const pid = c.get('project').id;
+  const rows = await db.select({ id: schema.users.id, username: schema.users.username, displayName: schema.users.displayName, email: schema.users.email, gitEmails: schema.users.gitEmails, color: schema.users.color, agentToken: schema.users.agentToken }).from(schema.users).where(eq(schema.users.projectId, pid)).orderBy(schema.users.createdAt);
+  return c.json(rows);
+});
+
+// add a coder to the team
+apiRoutes.post('/team/members', async (c) => {
+  const pid = c.get('project').id;
+  const body = (await c.req.json().catch(() => ({}))) as { displayName?: string; email?: string };
+  const displayName = body.displayName?.trim().slice(0, 100);
+  if (!displayName) return c.json({ error: 'displayName required' }, 400);
+  const base = displayName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'coder';
+  const existing = await db.select({ username: schema.users.username }).from(schema.users).where(eq(schema.users.projectId, pid));
+  let username = base; let i = 1;
+  const taken = new Set(existing.map((u) => u.username));
+  while (taken.has(username)) username = `${base}-${i++}`;
+  const color = MGMT_COLORS[existing.length % MGMT_COLORS.length]!;
+  const [u] = await db.insert(schema.users).values({ projectId: pid, username, displayName, email: body.email?.trim() || null, color, agentToken: `dev-${crypto.randomUUID()}` }).returning({ id: schema.users.id, username: schema.users.username, displayName: schema.users.displayName, agentToken: schema.users.agentToken });
+  await db.insert(schema.userPresence).values({ userId: u!.id, projectId: pid, status: 'offline' }).onConflictDoNothing({ target: schema.userPresence.userId });
+  return c.json(u, 201);
+});
+
+// edit a coder (name, login email, git emails for attribution, color)
+apiRoutes.patch('/team/members/:id', async (c) => {
+  const pid = c.get('project').id;
+  const id = c.req.param('id');
+  const body = (await c.req.json().catch(() => ({}))) as { displayName?: string; email?: string | null; gitEmails?: string[]; color?: string };
+  const patch: Record<string, unknown> = {};
+  if (typeof body.displayName === 'string' && body.displayName.trim()) patch['displayName'] = body.displayName.trim().slice(0, 100);
+  if (body.email !== undefined) patch['email'] = body.email?.trim() || null;
+  if (Array.isArray(body.gitEmails)) patch['gitEmails'] = body.gitEmails.map((e) => e.trim().toLowerCase()).filter(Boolean);
+  if (typeof body.color === 'string') patch['color'] = body.color.slice(0, 20);
+  if (Object.keys(patch).length === 0) return c.json({ error: 'nothing to update' }, 400);
+  const [u] = await db.update(schema.users).set(patch).where(and(eq(schema.users.id, id), eq(schema.users.projectId, pid))).returning({ id: schema.users.id });
+  if (!u) return c.json({ error: 'unknown coder' }, 404);
+  return c.json({ ok: true });
+});
+
+// remove a coder from the team
+apiRoutes.delete('/team/members/:id', async (c) => {
+  const pid = c.get('project').id;
+  const id = c.req.param('id');
+  const [u] = await db.delete(schema.users).where(and(eq(schema.users.id, id), eq(schema.users.projectId, pid))).returning({ id: schema.users.id });
+  if (!u) return c.json({ error: 'unknown coder' }, 404);
+  return c.json({ ok: true });
+});
+
+// rotate a coder's agent token (revokes the old one)
+apiRoutes.post('/team/members/:id/rotate-token', async (c) => {
+  const pid = c.get('project').id;
+  const id = c.req.param('id');
+  const agentToken = `dev-${crypto.randomUUID()}`;
+  const [u] = await db.update(schema.users).set({ agentToken }).where(and(eq(schema.users.id, id), eq(schema.users.projectId, pid))).returning({ id: schema.users.id });
+  if (!u) return c.json({ error: 'unknown coder' }, 404);
+  return c.json({ agentToken });
+});
+
 // token-usage trend — tokens per day (from session rollups, by last-seen day) so
 // the team can watch spend over time and drive it down.
 apiRoutes.get('/usage/trend', async (c) => {

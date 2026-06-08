@@ -19,3 +19,16 @@ export function scrubSecrets(input: string): string {
   for (const re of PATTERNS) out = out.replace(re, '[REDACTED]');
   return out;
 }
+
+/** Recursively scrub secrets from string values in an arbitrary object (e.g. a
+ *  hook tool_input that may carry a Bash command or pasted credential). */
+export function scrubDeep<T>(value: T): T {
+  if (typeof value === 'string') return scrubSecrets(value) as T;
+  if (Array.isArray(value)) return value.map((v) => scrubDeep(v)) as T;
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) out[k] = scrubDeep(v);
+    return out as T;
+  }
+  return value;
+}

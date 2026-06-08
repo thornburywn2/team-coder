@@ -44,6 +44,8 @@ export const projects = pgTable('projects', {
   token: varchar('token', { length: 128 }).notNull().unique(),
   githubRepoUrl: text('github_repo_url'), // the project's product repo (git-poll source)
   prd: text('prd'), // project end-goal / PRD (markdown)
+  gitPollEnabled: boolean('git_poll_enabled').notNull().default(true), // per-project poll toggle
+  archivedAt: timestamp('archived_at', { withTimezone: true }), // soft-archive
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

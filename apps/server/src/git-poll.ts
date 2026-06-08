@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { count, desc, eq, isNotNull } from 'drizzle-orm';
+import { count, desc, eq, isNotNull, isNull, and } from 'drizzle-orm';
 import { db, schema } from './db';
 import { publish } from './state';
 
@@ -153,13 +153,13 @@ export async function pollGitAll(): Promise<GitPollResult[]> {
 
   const baseDir = process.env.PRODUCT_REPOS_DIR ?? '.product-repos';
   const projects = await db
-    .select({ id: schema.projects.id, githubRepoUrl: schema.projects.githubRepoUrl })
+    .select({ id: schema.projects.id, githubRepoUrl: schema.projects.githubRepoUrl, pollEnabled: schema.projects.gitPollEnabled })
     .from(schema.projects)
-    .where(isNotNull(schema.projects.githubRepoUrl));
+    .where(and(isNotNull(schema.projects.githubRepoUrl), isNull(schema.projects.archivedAt)));
 
   const results: GitPollResult[] = [];
   for (const p of projects) {
-    if (!p.githubRepoUrl) continue;
+    if (!p.githubRepoUrl || !p.pollEnabled) continue; // per-project poll toggle
     results.push(
       await pollGitRepo({ projectId: p.id, repoDir: resolve(baseDir, p.id), repoUrl: p.githubRepoUrl }),
     );

@@ -8,6 +8,10 @@ import { db, schema } from '../db';
 
 export const publicProjectRoutes = new Hono();
 
+// When ADMIN_TOKEN is set, creating a project requires it (anti-abuse on a shared
+// network). Left open only in dev when unset — index.ts logs a warning then.
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
+
 // Color palette cycled across the team roster (swim-lane colors).
 const COLORS = ['#e6194B', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#f032e6', '#bfef45', '#fabed4', '#469990'];
 
@@ -34,6 +38,9 @@ function rosterFrom(names: string[], projectId: string) {
 }
 
 publicProjectRoutes.post('/', async (c) => {
+  if (ADMIN_TOKEN && c.req.header('x-admin-token') !== ADMIN_TOKEN) {
+    return c.json({ error: 'admin token required to create a project' }, 401);
+  }
   const body = (await c.req.json().catch(() => ({}))) as { name?: string; githubRepoUrl?: string; members?: string[] };
   const name = body.name?.trim();
   if (!name) return c.json({ error: 'name required' }, 400);

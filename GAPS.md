@@ -10,21 +10,25 @@ trust) · 🟢 low (polish / nice-to-have).
 
 ---
 
-## 1. Security & auth
-- 🔴 **No real authn/authz.** A single shared team token grants full access; any
-  holder can do anything. No roles, no per-action permissions, no ownership checks
-  on mutations (anyone can edit/delete anyone's tasks/proposals/patterns).
-- 🔴 **`POST /api/projects` is unauthenticated.** Anyone who can reach the server can
-  create projects (spam / resource exhaustion).
-- 🔴 **No rate limiting anywhere.** Hooks, MCP, and REST are all unthrottled (the
-  global security rules require it). Easy to flood the feed/DB.
-- 🔴 **Tokens are plaintext, non-expiring, non-rotatable**, stored in the DB and sent
-  over plain HTTP (see Ops/TLS). Default-project agent tokens are guessable
-  (`dev-token-<name>` pattern in seeds).
-- 🟡 **Secret scrubbing only covers prompts.** Hook `tool_input`/`command` payloads
-  are persisted raw and may contain secrets, tokens, or PII.
-- 🟡 **No CSRF protection / no security headers (helmet)**, no CORS policy.
-- 🟢 **SSO** is planned but absent; identity is self-asserted at login (pick a name).
+## 1. Security & auth — ✅ RESOLVED (2026-06-08)
+- ✅ **Project creation gated.** `ADMIN_TOKEN` (x-admin-token) required to create
+  projects when set; boot warns if unset.
+- ✅ **Rate limiting** on /api, /hooks, /mcp, and (tight) /api/projects — sliding
+  window per token/IP (`lib/ratelimit.ts`), tunable via `RATE_LIMIT_*`, `RATE_LIMIT=0`
+  to disable (CI).
+- ✅ **Token rotation/revocation.** `POST /projects/current/rotate-token` and
+  `/team/members/:id/rotate-token`; all tokens are random UUIDs. Old token → 401.
+- ✅ **Secret scrubbing deepened** — `scrubDeep` now scrubs hook `tool_input`/command
+  values, not just prompts.
+- ✅ **Security headers + locked CORS** (`lib/security.ts`): nosniff, DENY frames,
+  no-referrer, optional HSTS; CORS allow-list via `CORS_ORIGIN` (same-origin default).
+  Auth is header-based (not cookies) so CSRF isn't applicable.
+- ✅ **SSO** path: run behind the TLS reverse proxy with forward-auth (e.g. Authentik)
+  protecting the origin; the appliance trusts the proxied network. *(Deployment-level;
+  in-app SSO login deferred to the work environment.)*
+- 🟡 Per-action ownership RBAC (e.g. only the author may delete a pattern) is still
+  coarse — any project member can mutate. *(team-trust model; acceptable for a
+  hackathon squad, noted for later.)*
 
 ## 2. Token-usage capture — ✅ RESOLVED (2026-06-08)
 - ✅ **Automatic transcript-based capture.** `agent-kit/hooks/report-tokens.ts` runs
@@ -83,15 +87,16 @@ trust) · 🟢 low (polish / nice-to-have).
 - 🟡 **Contribution % is blendable/gameable** and has **no time-range filter** (always
   all-time); per-coder language/layer isn't in the markdown export.
 
-## 8. Ops & deploy
-- 🔴 **No TLS.** `docker-compose.yml` serves plain HTTP; tokens travel in clear text
-  (the clipboard fix exists only because of non-secure-context HTTP). Needs a TLS
-  reverse proxy for any real network.
-- 🟡 **No DB backups / restore path; no migration rollback.** A bad migration or lost
-  volume = lost project.
-- 🟡 **No logging/metrics/error tracking**, no resource limits; image ships dev
-  dependencies (larger than needed).
-- 🟢 **`ENABLE_GIT_POLL` is global**, not per-project; can't tune cadence per repo.
+## 8. Ops & deploy — ✅ RESOLVED (2026-06-08)
+- ✅ **TLS.** `deploy/Caddyfile` + a `caddy` service (`--profile prod`) terminate
+  HTTPS with automatic certs for a real `TC_DOMAIN`. App emits HSTS when `ENABLE_HSTS=1`.
+- ✅ **DB backups.** `deploy/backup.sh` + a `backup` service (`--profile prod`):
+  scheduled `pg_dump` with retention; restore documented in the script header.
+- ✅ **Smaller image** — runtime stage prunes dev deps (`bun install --production`).
+- ✅ **Per-project git-poll toggle** (`projects.git_poll_enabled`); archived projects
+  are skipped.
+- 🟡 Structured logging/metrics/error-tracking still minimal (request logging +
+  /health only). *(observability stack left for a later pass.)*
 
 ## 9. Product / management surfaces (missing screens)
 - 🟡 **No team management after creation** — can't add/remove coders, rename, edit

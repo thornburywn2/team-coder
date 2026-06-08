@@ -33,7 +33,8 @@
     "verify:extras": "bun run src/verify-extras.ts",
     "verify:locks": "bun run src/verify-locks.ts",
     "verify:attribution": "bun run src/verify-attribution.ts",
-    "verify:all": "bun run db:verify && bun run verify:ws && bun run verify:hooks && bun run verify:ownership && bun run verify:mcp && bun run verify:gitpoll && bun run verify:report && bun run verify:isolation && bun run verify:notes && bun run verify:decompose && bun run verify:proposals && bun run verify:inheritance && bun run verify:reusekit && bun run verify:capabilities && bun run verify:audit && bun run verify:collisions && bun run verify:polish && bun run verify:extras && bun run verify:locks && bun run verify:attribution"
+    "verify:security": "bun run src/verify-security.ts",
+    "verify:all": "bun run db:verify && bun run verify:ws && bun run verify:hooks && bun run verify:ownership && bun run verify:mcp && bun run verify:gitpoll && bun run verify:report && bun run verify:isolation && bun run verify:notes && bun run verify:decompose && bun run verify:proposals && bun run verify:inheritance && bun run verify:reusekit && bun run verify:capabilities && bun run verify:audit && bun run verify:collisions && bun run verify:polish && bun run verify:extras && bun run verify:locks && bun run verify:attribution && bun run verify:security"
   },
   "dependencies": {
     "@team-coder/shared": "workspace:*",

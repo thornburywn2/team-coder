@@ -11,6 +11,8 @@ import { startDbListener } from './db/listener';
 import { refreshOwnership } from './ownership';
 import { gitPollAndBroadcast } from './git-poll';
 import { checkIdle } from './idle';
+import { securityHeaders, cors } from './lib/security';
+import { rateLimit } from './lib/ratelimit';
 
 // ── Team Coder server (Bun runtime) ──────────────────────────────────────────
 // Mounts: /health, /api (REST, team-token gated), /ws (WebSocket fan-out).
@@ -25,6 +27,10 @@ const serveWeb = existsSync(resolve(WEB_DIST));
 
 const app = new Hono();
 
+// security headers on every response + locked CORS (allow-list via CORS_ORIGIN)
+app.use('*', securityHeaders);
+app.use('*', cors);
+
 app.get('/health', (c) =>
   c.json({
     ok: true,
@@ -33,6 +39,15 @@ app.get('/health', (c) =>
     ts: Date.now(),
   }),
 );
+
+// Rate limits per route family (per token/IP). Hooks are high-volume (agents),
+// project creation is deliberately tight (anti-abuse), API/MCP sit in between.
+// Tune via RATE_LIMIT_* env; disable entirely with RATE_LIMIT=0.
+const rlWindow = Number(process.env.RATE_LIMIT_WINDOW_MS ?? 60_000);
+app.use('/api/projects', rateLimit({ name: 'projects', max: Number(process.env.RATE_LIMIT_PROJECTS ?? 10), windowMs: rlWindow }));
+app.use('/api/*', rateLimit({ name: 'api', max: Number(process.env.RATE_LIMIT_API ?? 600), windowMs: rlWindow }));
+app.use('/hooks/*', rateLimit({ name: 'hooks', max: Number(process.env.RATE_LIMIT_HOOKS ?? 1200), windowMs: rlWindow }));
+app.use('/mcp', rateLimit({ name: 'mcp', max: Number(process.env.RATE_LIMIT_MCP ?? 600), windowMs: rlWindow }));
 
 // Project creation is open (no token yet) and must be matched before the
 // team-token-gated /api router, so register it first.
@@ -52,6 +67,11 @@ if (serveWeb) {
 }
 
 const port = Number(process.env.PORT ?? 6300);
+
+// surface insecure defaults loudly at boot (prod hardening checklist)
+if (!process.env.ADMIN_TOKEN) console.warn('[security] ADMIN_TOKEN unset — project creation is OPEN. Set ADMIN_TOKEN in production.');
+if ((process.env.TEAM_TOKEN ?? 'change-me-team-token') === 'change-me-team-token') console.warn('[security] using the default demo TEAM_TOKEN — change it in production.');
+if (process.env.ENABLE_HSTS !== '1') console.warn('[security] serve behind the TLS reverse proxy (deploy/Caddyfile) and set ENABLE_HSTS=1 in production.');
 
 // Start the realtime DB listener. Non-fatal if the DB is down so /health still
 // answers and the process stays up.

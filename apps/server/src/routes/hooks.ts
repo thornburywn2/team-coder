@@ -4,7 +4,7 @@ import { and, eq, gte, isNotNull, ne, sql } from 'drizzle-orm';
 import { HookEventSchema, type HookEventPayload } from '@team-coder/shared';
 import { db, schema } from '../db';
 import { devAuth, type Developer } from '../auth';
-import { scrubSecrets } from '../lib/scrub';
+import { scrubSecrets, scrubDeep } from '../lib/scrub';
 import { pushFeed, type FeedItem } from '../feed';
 import { touchHook } from '../connections';
 import { COLLISION_WINDOW_MS, recordCollision } from '../collisions';
@@ -104,7 +104,7 @@ async function ingest(dev: Developer, ev: HookEventPayload): Promise<void> {
       eventName: ev.hook_event_name,
       toolName: ev.tool_name ?? null,
       filePath: file ?? null,
-      payload: { ...ev, prompt: scrubbedPrompt }, // store scrubbed copy
+      payload: scrubDeep({ ...ev, prompt: scrubbedPrompt }), // scrub prompt + tool_input/command secrets
       agentId: ev.agent_transcript_path ?? null,
     }),
     db

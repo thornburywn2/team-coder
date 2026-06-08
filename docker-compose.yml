@@ -41,6 +41,12 @@ services:
       NODE_ENV: production
       # shared human portal token — CHANGE THIS for a real deployment
       TEAM_TOKEN: ${TEAM_TOKEN:-change-me-team-token}
+      # security hardening (see .env.example): require admin token to create
+      # projects, lock CORS, emit HSTS (set when behind the TLS proxy)
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
+      ENABLE_HSTS: ${ENABLE_HSTS:-}
+      TOKEN_RATES_JSON: ${TOKEN_RATES_JSON:-}
       # optional: tool-agnostic git contribution polling (per-project repo URLs)
       ENABLE_GIT_POLL: ${ENABLE_GIT_POLL:-}
       PRODUCT_REPOS_DIR: /data/product-repos
@@ -50,6 +56,43 @@ services:
     volumes:
       - team_coder_repos:/data/product-repos
 
+  # ── production hardening (opt-in): `docker compose --profile prod up -d` ──
+  # TLS reverse proxy in front of the app (automatic HTTPS for a real TC_DOMAIN).
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    profiles: ["prod"]
+    depends_on: [app]
+    environment:
+      TC_DOMAIN: ${TC_DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  # scheduled Postgres backups with retention (see deploy/backup.sh)
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    profiles: ["prod"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-teamcoder}:${POSTGRES_PASSWORD:-teamcoder}@db:5432/${POSTGRES_DB:-teamcoder}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_KEEP: ${BACKUP_KEEP:-7}
+    entrypoint: ["sh", "/backup.sh"]
+    volumes:
+      - ./deploy/backup.sh:/backup.sh:ro
+      - team_coder_backups:/backups
+
 volumes:
   team_coder_pgdata:
   team_coder_repos:
+  team_coder_backups:
+  caddy_data:
+  caddy_config:

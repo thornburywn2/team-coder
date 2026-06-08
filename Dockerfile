@@ -26,6 +26,9 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app /app
+# drop dev dependencies (drizzle-kit, @types, …) from the runtime image — the
+# server runs straight from source via Bun and needs only runtime deps.
+RUN cd /app && bun install --frozen-lockfile --production || true
 RUN chmod +x /app/docker-entrypoint.sh
 
 ENV NODE_ENV=production \

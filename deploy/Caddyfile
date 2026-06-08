@@ -1,0 +1,15 @@
+# TLS reverse proxy for Team Coder. Caddy terminates HTTPS (automatic certs for a
+# real domain; a local self-signed cert for localhost) and proxies to the app.
+#
+# Set TC_DOMAIN in .env (e.g. team-coder.wbtlabs.com). With a public domain + ports
+# 80/443 reachable, Caddy provisions a Let's Encrypt cert automatically.
+
+{$TC_DOMAIN:localhost} {
+	encode gzip zstd
+	# WebSocket + API + SPA all live on the one app port (single-origin)
+	reverse_proxy app:6300
+	header {
+		Strict-Transport-Security "max-age=15552000; includeSubDomains"
+		-Server
+	}
+}
