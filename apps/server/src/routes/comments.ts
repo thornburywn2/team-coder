@@ -4,6 +4,7 @@ import { ENTITY_TYPE } from '@team-coder/shared';
 import { db, schema } from '../db';
 import type { Project } from '../auth';
 import { pushFeed } from '../feed';
+import { page } from '../lib/paginate';
 
 // Messaging: anchored discussion threads (NOT general chat). A comment always
 // targets a task or proposal (polymorphic targetType/targetId), optionally
@@ -18,11 +19,14 @@ commentRoutes.get('/', async (c) => {
   const targetType = c.req.query('targetType');
   const targetId = c.req.query('targetId');
   if (!targetType || !targetId) return c.json({ error: 'targetType and targetId required' }, 400);
+  const { limit, offset } = page(c);
   const rows = await db
     .select()
     .from(schema.comments)
     .where(and(eq(schema.comments.projectId, pid), eq(schema.comments.targetType, targetType as never), eq(schema.comments.targetId, targetId)))
-    .orderBy(asc(schema.comments.createdAt));
+    .orderBy(asc(schema.comments.createdAt))
+    .limit(limit)
+    .offset(offset);
   return c.json(rows);
 });
 

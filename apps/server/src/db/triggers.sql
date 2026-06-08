@@ -53,10 +53,6 @@ DROP TRIGGER IF EXISTS trg_modules_change ON modules;
 CREATE TRIGGER trg_modules_change AFTER INSERT OR UPDATE OR DELETE ON modules
   FOR EACH ROW EXECUTE FUNCTION notify_record_change('id');
 
-DROP TRIGGER IF EXISTS trg_activity_change ON activity_events;
-CREATE TRIGGER trg_activity_change AFTER INSERT ON activity_events
-  FOR EACH ROW EXECUTE FUNCTION notify_record_change('id');
-
 DROP TRIGGER IF EXISTS trg_presence_change ON user_presence;
 CREATE TRIGGER trg_presence_change AFTER INSERT OR UPDATE OR DELETE ON user_presence
   FOR EACH ROW EXECUTE FUNCTION notify_record_change('user_id');

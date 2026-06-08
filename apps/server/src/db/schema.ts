@@ -30,9 +30,6 @@ export const voteValue = pgEnum('vote_value', ['approve', 'reject', 'abstain']);
 export const entityType = pgEnum('entity_type', [
   'task', 'proposal', 'adr', 'code_pattern', 'comment', 'module',
 ]);
-export const eventAction = pgEnum('event_action', [
-  'created', 'updated', 'deleted', 'status_changed', 'commented', 'voted', 'claimed', 'completed',
-]);
 export const presenceStatus = pgEnum('presence_status', [
   'active', 'thinking', 'idle', 'offline',
 ]);
@@ -186,6 +183,7 @@ export const codePatterns = pgTable('code_patterns', {
   language: varchar('language', { length: 50 }),
   tags: jsonb('tags').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   authorId: uuid('author_id').references(() => users.id, { onDelete: 'set null' }),
+  version: integer('version').notNull().default(1), // bumped when a same-title pattern is re-published
   idempotencyKey: varchar('idempotency_key', { length: 128 }), // see adrs.idempotencyKey
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
@@ -205,20 +203,6 @@ export const comments = pgTable('comments', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => ({
   targetIdx: index('idx_comments_target').on(t.targetType, t.targetId),
-}));
-
-// ── Immutable activity feed / audit log ──────────────────────────────────────
-export const activityEvents = pgTable('activity_events', {
-  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
-  projectId: pid(),
-  actorId: uuid('actor_id').references(() => users.id, { onDelete: 'set null' }),
-  action: eventAction('action').notNull(),
-  targetType: entityType('target_type').notNull(),
-  targetId: uuid('target_id').notNull(),
-  metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (t) => ({
-  projectIdx: index('idx_activity_project').on(t.projectId, t.createdAt),
 }));
 
 // ── Observability: raw hook events + session rollups ─────────────────────────

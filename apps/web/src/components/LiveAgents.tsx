@@ -24,6 +24,7 @@ export function LiveAgents() {
               <span className={`dot sm dot-${a.status === 'active' ? 'active' : 'idle'}`} style={{ background: a.color ?? '#888' }} />
               <span className="who">{a.developerName}</span>
               {a.currentFile && <code className="file">{a.currentFile.split('/').pop()}</code>}
+              {a.subagents > 1 && <span className="small muted" title={`${a.subagents} sub-agents active in this session`}>+{a.subagents - 1}🤖</span>}
               <span className="time">{ago(a.lastSeenAt)}</span>
             </li>
           ))}

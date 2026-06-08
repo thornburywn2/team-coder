@@ -25,13 +25,6 @@ async function toMessage(n: Notification): Promise<WsMessage | null> {
       if (!row) return null;
       return { type: n.op === 'INSERT' ? 'TASK_CREATED' : 'TASK_UPDATED', payload: row, meta: { projectId: row.projectId ?? undefined } };
     }
-    case 'activity_events': {
-      const [row] = await db
-        .select()
-        .from(schema.activityEvents)
-        .where(eq(schema.activityEvents.id, n.id));
-      return row ? { type: 'ACTIVITY_EVENT', payload: row, meta: { projectId: row.projectId ?? undefined } } : null;
-    }
     case 'user_presence': {
       if (n.op === 'DELETE') {
         return { type: 'PRESENCE_UPDATE', payload: { userId: n.id }, meta: { developerId: n.id } };

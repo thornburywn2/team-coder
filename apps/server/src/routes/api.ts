@@ -349,13 +349,18 @@ apiRoutes.get('/agents', async (c) => {
     .orderBy(desc(schema.sessions.lastSeenAt));
 
   const sids = sess.map((s) => s.sessionId);
-  const [people, events] = await Promise.all([
+  const [people, events, subAgg] = await Promise.all([
     db.select({ id: schema.users.id, displayName: schema.users.displayName, username: schema.users.username, color: schema.users.color }).from(schema.users).where(eq(schema.users.projectId, pid)),
     sids.length
       ? db.select({ sessionId: schema.hookEvents.sessionId, filePath: schema.hookEvents.filePath, ts: schema.hookEvents.ts }).from(schema.hookEvents).where(and(eq(schema.hookEvents.projectId, pid), inArray(schema.hookEvents.sessionId, sids), isNotNull(schema.hookEvents.filePath)))
       : Promise.resolve([] as { sessionId: string; filePath: string | null; ts: Date }[]),
+    // distinct agents (incl. subagents) per session — agent_id separates subagents
+    sids.length
+      ? db.select({ sessionId: schema.hookEvents.sessionId, agents: sql<number>`count(distinct ${schema.hookEvents.agentId})` }).from(schema.hookEvents).where(and(eq(schema.hookEvents.projectId, pid), inArray(schema.hookEvents.sessionId, sids), isNotNull(schema.hookEvents.agentId))).groupBy(schema.hookEvents.sessionId)
+      : Promise.resolve([] as { sessionId: string; agents: number }[]),
   ]);
   const user = (id: string | null) => people.find((p) => p.id === id);
+  const subOf = new Map(subAgg.map((r) => [r.sessionId, Number(r.agents)]));
   const now = Date.now();
 
   const agents = sess.map((s) => {
@@ -376,6 +381,7 @@ apiRoutes.get('/agents', async (c) => {
       activeMinutes: Math.max(0, Math.round((new Date(s.lastSeenAt).getTime() - new Date(s.startedAt).getTime()) / 60000)),
       filesTouched: files.size,
       currentFile: latest?.filePath ?? null,
+      subagents: subOf.get(s.sessionId) ?? 0, // distinct sub-agents under this session
       status: ageMs < 90_000 ? 'active' : ageMs < 5 * 60_000 ? 'idle' : 'away',
     };
   });

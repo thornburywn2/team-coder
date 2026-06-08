@@ -185,6 +185,7 @@ export interface Agent {
   activeMinutes: number;
   filesTouched: number;
   currentFile: string | null;
+  subagents: number;
   status: 'active' | 'idle' | 'away';
 }
 

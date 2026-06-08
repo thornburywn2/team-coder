@@ -5,6 +5,7 @@ import { db, schema } from '../db';
 import type { Project } from '../auth';
 import { pushFeed } from '../feed';
 import { decomposePrd } from '../lib/decompose';
+import { page } from '../lib/paginate';
 
 // Design-evolution channel: proposals (ideas / direction changes, optionally tied
 // to an experiment branch — "prove then inherit") that the team votes on and
@@ -25,8 +26,9 @@ async function actorName(projectId: string, userId: string | undefined) {
 // list proposals with vote tallies + comment counts (author resolved client-side)
 proposalRoutes.get('/', async (c) => {
   const pid = c.get('project').id;
+  const { limit, offset } = page(c);
   const [rows, votes, commentCounts] = await Promise.all([
-    db.select().from(schema.proposals).where(eq(schema.proposals.projectId, pid)).orderBy(desc(schema.proposals.createdAt)),
+    db.select().from(schema.proposals).where(eq(schema.proposals.projectId, pid)).orderBy(desc(schema.proposals.createdAt)).limit(limit).offset(offset),
     db.select({ proposalId: schema.votes.proposalId, voterId: schema.votes.voterId, vote: schema.votes.vote }).from(schema.votes).where(eq(schema.votes.projectId, pid)),
     db.select({ targetId: schema.comments.targetId, n: count() }).from(schema.comments).where(and(eq(schema.comments.projectId, pid), eq(schema.comments.targetType, 'proposal'))).groupBy(schema.comments.targetId),
   ]);

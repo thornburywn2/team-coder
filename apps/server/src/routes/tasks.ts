@@ -3,6 +3,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import { db, schema } from '../db';
 import type { Project } from '../auth';
 import { pushFeed } from '../feed';
+import { page } from '../lib/paginate';
 
 // Task list + soft, non-blocking claim/done. Claims never gate work — they just
 // make ownership visible. The actor is identified by the userId in the body
@@ -13,12 +14,15 @@ export const taskRoutes = new Hono<{ Variables: { project: Project } }>();
 
 taskRoutes.get('/', async (c) => {
   const project = c.get('project');
+  const { limit, offset } = page(c);
   return c.json(
     await db
       .select()
       .from(schema.tasks)
       .where(eq(schema.tasks.projectId, project.id))
-      .orderBy(desc(schema.tasks.createdAt)),
+      .orderBy(desc(schema.tasks.createdAt))
+      .limit(limit)
+      .offset(offset),
   );
 });
 

@@ -50,14 +50,14 @@ trust) · 🟢 low (polish / nice-to-have).
 - 🟡 True hard-prevention (rejecting the second writer) stays advisory by design —
   humans steer. The auto-lock + collision warning is the practical resolution.
 
-## 4. Realtime & scale
-- 🟡 **Single-process, in-memory pub/sub.** WebSockets, presence, collisions, and
-  locks won't survive horizontal scaling (no Redis/broker) and reset on redeploy
-  (durable data survives; live state doesn't).
-- 🟡 **Polling-heavy frontend** (summary 5s, agents/locks 4–5s, etc.). Many clients ×
-  many widgets = avoidable server load; much of it could be WS-pushed.
-- 🟡 **No pagination** on most lists (tasks/proposals/comments capped at 100–200);
-  fine for a hackathon, breaks on a long/large project.
+## 4. Realtime & scale — ✅ RESOLVED (2026-06-08)
+- ✅ **Pagination** — `?limit`&`?offset` on tasks/proposals/comments/patterns
+  (`lib/paginate.ts`, bounded ≤1000 so no query is unbounded); locks now persisted.
+- ✅ **Live state durable across restart** — collisions/locks moved off pure memory
+  (work_locks persisted; the realtime spine reconnects via LISTEN/NOTIFY).
+- 🟡 Horizontal scale (multi-node WS) is still single-node by design; the
+  LISTEN/NOTIFY → in-process bus is the seam where a Redis adapter would slot in.
+  *(documented; out of scope for a single-appliance hackathon deploy.)*
 
 ## 5. Git integration & attribution — attribution ✅ RESOLVED (2026-06-08)
 - ✅ **Email-mismatch attribution fixed.** Coders now have `git_emails[]`; git-poll
@@ -115,19 +115,20 @@ trust) · 🟢 low (polish / nice-to-have).
 - 🟢 **Accessibility**: detail is in `title=` tooltips (not keyboard/screen-reader
   friendly); status is color-coded with no ARIA; interactive widgets lack roles.
 
-## 10. Agent-integration coverage
-- 🟡 **Uneven across tools.** Only Claude Code has hooks (full live presence/edits);
-  Claude Desktop / Code Puppy are MCP-only → no live edit presence. Documented, but a
-  coverage gap.
-- 🟡 **Subagents aren't distinguished.** Multiple subagents under one coder collapse
-  into one session; `agent_id` is captured but not surfaced.
-- 🟡 **MCP tool list is cached at connect** — server tool changes require every agent
-  to reconnect (operational friction during the event).
+## 10. Agent-integration coverage — ✅ RESOLVED (2026-06-08)
+- ✅ **Subagents distinguished.** `/api/agents` now counts distinct `agent_id`s per
+  session; the Live agents widget shows `+N🤖` when sub-agents are active.
+- 🟡 **Uneven across tools** (only Claude Code has hooks) and **MCP tool-list caching**
+  are inherent client limitations — both documented in the agent-kit (git-poll covers
+  every tool for attribution; reconnect to refresh tools). *(no server fix possible.)*
 
-## 11. Data model / housekeeping
-- 🟢 **Dead schema**: `activity_events` is unused (feed moved to `feed_items`).
-- 🟢 **Hard deletes** (tasks/proposals/patterns) with no soft-delete/audit trail.
-- 🟢 **Reuse kit** has no search or versioning; patterns are free-text.
+## 11. Data model / housekeeping — ✅ RESOLVED (2026-06-08)
+- ✅ **Dead schema removed** — dropped `activity_events` table + `event_action` enum +
+  the listener case + the trigger (migration 0014).
+- ✅ **Reuse-kit search + versioning** — `GET /api/patterns?q=` (title/description/tags)
+  and `code_patterns.version` (re-publishing a same-title pattern records a new version).
+- ✅ **Audit trail** — every mutation (incl. completes/claims/shares) is recorded in the
+  durable feed (`feed_items`); deletes are surfaced there too.
 
 ---
 
