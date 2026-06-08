@@ -9,7 +9,7 @@ import { mcpRoutes } from './routes/mcp';
 import { wsRoute, websocket } from './ws';
 import { startDbListener } from './db/listener';
 import { refreshOwnership } from './ownership';
-import { pollGitAll } from './git-poll';
+import { gitPollAndBroadcast } from './git-poll';
 import { checkIdle } from './idle';
 
 // ── Team Coder server (Bun runtime) ──────────────────────────────────────────
@@ -69,7 +69,7 @@ tick();
 // when new commits land. No-op when PRODUCT_REPO_URL/PATH is unset.
 const GIT_POLL_MS = Number(process.env.PRODUCT_REPO_POLL_SECONDS ?? 300) * 1000;
 const gitTick = () =>
-  pollGitAll()
+  gitPollAndBroadcast()
     .then((results) => { if (results.some((r) => r.newCommits > 0)) refreshOwnership(); })
     .catch((err) => console.error('[git-poll] failed:', err?.message ?? err));
 setInterval(gitTick, GIT_POLL_MS);

@@ -1,7 +1,8 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { eq, isNotNull } from 'drizzle-orm';
+import { count, desc, eq, isNotNull } from 'drizzle-orm';
 import { db, schema } from './db';
+import { publish } from './state';
 
 // Tool-agnostic ground truth: for each project that has a githubRepoUrl, poll a
 // clone of its product repo and ingest `git log --numstat` into git_commits +
@@ -150,6 +151,23 @@ export async function pollGitAll(): Promise<GitPollResult[]> {
     results.push(
       await pollGitRepo({ projectId: p.id, repoDir: resolve(baseDir, p.id), repoUrl: p.githubRepoUrl }),
     );
+  }
+  return results;
+}
+
+/**
+ * Poll all repos and BROADCAST a REPO_UPDATED for each project that got new
+ * commits, so connected clients (and engineers' local-sync watchers) know to
+ * fast-forward their clones. Returns the poll results.
+ */
+export async function gitPollAndBroadcast(): Promise<GitPollResult[]> {
+  const results = await pollGitAll();
+  for (const r of results) {
+    if (r.newCommits <= 0) continue;
+    const [latest] = await db.select({ sha: schema.gitCommits.sha, committedAt: schema.gitCommits.committedAt }).from(schema.gitCommits).where(eq(schema.gitCommits.projectId, r.projectId)).orderBy(desc(schema.gitCommits.committedAt)).limit(1);
+    const [{ n } = { n: 0 }] = await db.select({ n: count() }).from(schema.gitCommits).where(eq(schema.gitCommits.projectId, r.projectId));
+    const [p] = await db.select({ url: schema.projects.githubRepoUrl }).from(schema.projects).where(eq(schema.projects.id, r.projectId));
+    publish({ type: 'REPO_UPDATED', payload: { repoUrl: p?.url ?? null, latestSha: latest?.sha ?? null, newCommits: r.newCommits, commitCount: Number(n) }, meta: { projectId: r.projectId } });
   }
   return results;
 }

@@ -143,7 +143,9 @@ try {
 
   // ── project goal (PRD) ──────────────────────────────────────────────────────
   const prd = `# Nimbus — team task & coordination app\n\nA fast, collaborative board for small teams.\n\n## Requirements\n- [ ] Real-time board with presence\n- [ ] Task CRUD with priority + tags\n- [ ] Auth with shared team token\n- [ ] Activity feed\n- [ ] Contribution report\n- [ ] Proposals + voting\n- [ ] Reusable pattern library\n- [ ] One-command deploy\n`;
-  await db.update(schema.projects).set({ prd }).where(eq(schema.projects.id, pid));
+  // null the repo URL: Nimbus is synthetic demo data, so it must NOT be git-polled
+  // (that would clone the real team-coder repo and overwrite this seeded history).
+  await db.update(schema.projects).set({ prd, githubRepoUrl: null }).where(eq(schema.projects.id, pid));
 
   // ── tasks (every state, source, priority) ───────────────────────────────────
   const prdTitles = ['Real-time board with presence', 'Task CRUD with priority + tags', 'Auth with shared team token', 'Activity feed', 'Contribution report', 'Proposals + voting', 'Reusable pattern library', 'One-command deploy'];

@@ -26,6 +26,17 @@ apiRoutes.use('*', teamAuth);
 // the project this token belongs to (name / repo / PRD) — for the board header
 apiRoutes.get('/projects/current', (c) => c.json(c.get('project')));
 
+// repo sync status — the linked repo + latest ingested commit, so engineers'
+// local-sync watchers (and the UI) know the team's current HEAD.
+apiRoutes.get('/repo/status', async (c) => {
+  const project = c.get('project');
+  const [latest] = await db
+    .select({ sha: schema.gitCommits.sha, committedAt: schema.gitCommits.committedAt, authorName: schema.gitCommits.authorName, message: schema.gitCommits.message })
+    .from(schema.gitCommits).where(eq(schema.gitCommits.projectId, project.id)).orderBy(desc(schema.gitCommits.committedAt)).limit(1);
+  const [{ n } = { n: 0 }] = await db.select({ n: count() }).from(schema.gitCommits).where(eq(schema.gitCommits.projectId, project.id));
+  return c.json({ repoUrl: project.githubRepoUrl, commitCount: Number(n), latest: latest ?? null });
+});
+
 // PRD ingestion — save/update the project's goal document (markdown).
 apiRoutes.put('/projects/current/prd', async (c) => {
   const project = c.get('project');

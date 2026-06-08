@@ -17,6 +17,10 @@ into the same coordination portal. Pick your client below:
 | Internal / custom tools | [internal-tools.md](./internal-tools.md) | MCP and/or hooks + git |
 | Web only (no agent) | [web.md](./web.md) | — |
 
+**Stay in sync:** run [`team-coder-sync.sh`](./team-coder-sync.sh) in your product
+repo so you fast-forward to teammates' pushes automatically — safely, never
+touching your own work. See [sync.md](./sync.md).
+
 ## The three things every client needs
 
 1. **Portal origin** — where the portal is served, e.g. `http://10.0.0.1:6300`

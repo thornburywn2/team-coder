@@ -16,6 +16,7 @@ export const WS_SERVER_MSG = [
   'COMMENT_ADDED', // a comment was posted on a task or proposal
   'NOTE_ADDED', // a project note was posted (project_notes insert)
   'PATTERN_ADDED', // a reusable code pattern was published to the kit
+  'REPO_UPDATED', // git-poll saw new commits on the project repo (payload: { repoUrl, latestSha, newCommits, commitCount }) — clients can ff-pull
 ] as const;
 export type WsServerMsgType = (typeof WS_SERVER_MSG)[number];
 
