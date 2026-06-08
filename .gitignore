@@ -27,3 +27,4 @@ logs/
 
 # postgres volume (if bind-mounted)
 .pgdata/
+.product-repos/

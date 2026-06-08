@@ -1,0 +1,23 @@
+# Dedicated Postgres for Team Coder. Port 5436 — the lower 543x ports are
+# already taken on this host (5432/5433/5434/5435 all in use).
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: team-coder-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: teamcoder
+      POSTGRES_PASSWORD: teamcoder
+      POSTGRES_DB: teamcoder
+    ports:
+      - "5436:5432"
+    volumes:
+      - team_coder_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U teamcoder -d teamcoder"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  team_coder_pgdata:

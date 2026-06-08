@@ -1,23 +1,55 @@
-# Dedicated Postgres for Team Coder. Port 5436 — the lower 543x ports are
-# already taken on this host (5432/5433/5434/5435 all in use).
+# Full stack — ONE command to deploy at work:
+#
+#     docker compose up -d --build
+#
+# Brings up Postgres + the Team Coder app (Bun server serving web + API + WS + MCP
+# on a single port). Everything is env-driven (see .env.example); copy to .env and
+# set at least TEAM_TOKEN. Data persists in named volumes.
+#
+# For LOCAL DEV (running Bun on the host) use docker-compose.dev.yml instead, which
+# starts only Postgres: `bun run db:up`.
+
 services:
   db:
     image: postgres:16-alpine
-    container_name: team-coder-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: teamcoder
-      POSTGRES_PASSWORD: teamcoder
-      POSTGRES_DB: teamcoder
-    ports:
-      - "5436:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-teamcoder}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-teamcoder}
+      POSTGRES_DB: ${POSTGRES_DB:-teamcoder}
     volumes:
       - team_coder_pgdata:/var/lib/postgresql/data
+    # exposed for debugging/migrations from the host; change POSTGRES_PORT if taken
+    ports:
+      - "${POSTGRES_PORT:-5436}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U teamcoder -d teamcoder"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-teamcoder} -d ${POSTGRES_DB:-teamcoder}"]
       interval: 5s
       timeout: 3s
       retries: 10
 
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # app talks to the db over the compose network (service name `db`, port 5432)
+      DATABASE_URL: postgres://${POSTGRES_USER:-teamcoder}:${POSTGRES_PASSWORD:-teamcoder}@db:5432/${POSTGRES_DB:-teamcoder}
+      PORT: "6300"
+      NODE_ENV: production
+      # shared human portal token — CHANGE THIS for a real deployment
+      TEAM_TOKEN: ${TEAM_TOKEN:-change-me-team-token}
+      # optional: tool-agnostic git contribution polling (per-project repo URLs)
+      ENABLE_GIT_POLL: ${ENABLE_GIT_POLL:-}
+      PRODUCT_REPOS_DIR: /data/product-repos
+      PRODUCT_REPO_POLL_SECONDS: ${PRODUCT_REPO_POLL_SECONDS:-300}
+    ports:
+      - "${APP_PORT:-6300}:6300"
+    volumes:
+      - team_coder_repos:/data/product-repos
+
 volumes:
   team_coder_pgdata:
+  team_coder_repos:
