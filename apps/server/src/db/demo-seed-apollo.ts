@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { db, queryClient, schema } from './index';
 import { pollGitRepo } from '../git-poll';
 
@@ -18,25 +18,41 @@ const rand = (a: number, b: number) => a + Math.floor(Math.random() * (b - a + 1
 const pick = <T>(xs: T[]): T => xs[Math.floor(Math.random() * xs.length)]!;
 
 try {
-  // fresh start (cascade removes any prior Apollo data + coders)
-  await db.delete(schema.projects).where(eq(schema.projects.token, TOKEN));
-  const [proj] = await db.insert(schema.projects).values({ name: 'Apollo (demo)', token: TOKEN, githubRepoUrl: REPO,
-    prd: '# Apollo — real-time analytics dashboard\n\n## Requirements\n- [ ] Metrics ingestion API\n- [ ] Dashboard grid + charts\n- [ ] Time-range filters\n- [ ] Saved dashboards\n- [ ] CSV export\n' }).returning({ id: schema.projects.id });
-  const pid = proj!.id;
+  const PRD = '# Apollo — real-time analytics dashboard\n\n## Requirements\n- [ ] Metrics ingestion API\n- [ ] Dashboard grid + charts\n- [ ] Time-range filters\n- [ ] Saved dashboards\n- [ ] CSV export\n';
+  // find-or-create the project so its id (and its coders' ids/tokens) stay STABLE
+  // across reseeds — a re-seed must not invalidate anyone's login.
+  const [existing] = await db.select({ id: schema.projects.id }).from(schema.projects).where(eq(schema.projects.token, TOKEN));
+  let pid: string;
+  if (existing) {
+    pid = existing.id;
+    await db.update(schema.projects).set({ name: 'Apollo (demo)', githubRepoUrl: REPO, prd: PRD }).where(eq(schema.projects.id, pid));
+  } else {
+    const [proj] = await db.insert(schema.projects).values({ name: 'Apollo (demo)', token: TOKEN, githubRepoUrl: REPO, prd: PRD }).returning({ id: schema.projects.id });
+    pid = proj!.id;
+  }
 
-  // roster — emails MATCH the repo commit authors so git-poll attributes their work
+  // clear prior DATA only (keep project + coders + modules + presence → stable ids)
+  for (const tbl of [schema.votes, schema.gitFileChanges, schema.comments, schema.feedItems, schema.hookEvents, schema.sessions, schema.adrs, schema.codePatterns, schema.projectNotes, schema.tasks, schema.gitCommits, schema.proposals] as const) {
+    await db.delete(tbl).where(eq((tbl as typeof schema.tasks).projectId, pid));
+  }
+
+  // roster — emails MATCH the repo commit authors so git-poll attributes their work.
+  // Upsert by (projectId, username): keeps existing ids + agent tokens on reseed.
   const defs = [
     { username: 'frank', displayName: 'Frank', email: 'frank@apollo.dev', color: '#e6194B', role: 'frontend' },
     { username: 'grace', displayName: 'Grace', email: 'grace@apollo.dev', color: '#3cb44b', role: 'backend' },
     { username: 'heidi', displayName: 'Heidi', email: 'heidi@apollo.dev', color: '#4363d8', role: 'database' },
     { username: 'ivan', displayName: 'Ivan', email: 'ivan@apollo.dev', color: '#f58231', role: 'shared' },
   ];
-  const coders = await db.insert(schema.users).values(defs.map((d) => ({ projectId: pid, username: d.username, displayName: d.displayName, email: d.email, color: d.color, agentToken: `dev-${crypto.randomUUID()}` }))).returning({ id: schema.users.id, username: schema.users.username });
+  await db.insert(schema.users)
+    .values(defs.map((d) => ({ projectId: pid, username: d.username, displayName: d.displayName, email: d.email, color: d.color, agentToken: `dev-${crypto.randomUUID()}` })))
+    .onConflictDoUpdate({ target: [schema.users.projectId, schema.users.username], set: { displayName: sql`excluded.display_name`, email: sql`excluded.email`, color: sql`excluded.color` } });
+  const coders = await db.select({ id: schema.users.id, username: schema.users.username }).from(schema.users).where(eq(schema.users.projectId, pid));
   const byRole = Object.fromEntries(defs.map((d) => [d.role, coders.find((c) => c.username === d.username)!]));
   const U = Object.fromEntries(coders.map((c) => [c.username, c]));
-  await db.insert(schema.userPresence).values(coders.map((c) => ({ userId: c.id, projectId: pid, status: 'offline' as const })));
+  await db.insert(schema.userPresence).values(coders.map((c) => ({ userId: c.id, projectId: pid, status: 'offline' as const }))).onConflictDoNothing({ target: schema.userPresence.userId });
 
-  // modules (match the repo's layout so git files map cleanly)
+  // modules (match the repo's layout so git files map cleanly) — upsert, stable ids
   const MODULES = [
     { name: 'frontend', pathPrefix: 'apps/web/', role: 'frontend' },
     { name: 'backend', pathPrefix: 'apps/server/', role: 'backend' },
@@ -44,7 +60,9 @@ try {
     { name: 'shared', pathPrefix: 'packages/shared/', role: 'shared' },
     { name: 'infra', pathPrefix: 'deploy/', role: 'frontend' },
   ];
-  await db.insert(schema.modules).values(MODULES.map((m) => ({ projectId: pid, name: m.name, pathPrefix: m.pathPrefix, ownerId: byRole[m.role]!.id })));
+  await db.insert(schema.modules)
+    .values(MODULES.map((m) => ({ projectId: pid, name: m.name, pathPrefix: m.pathPrefix, ownerId: byRole[m.role]!.id })))
+    .onConflictDoUpdate({ target: [schema.modules.projectId, schema.modules.pathPrefix], set: { ownerId: sql`excluded.owner_id`, name: sql`excluded.name` } });
 
   const FILES: Record<string, string[]> = {
     frank: ['apps/web/src/Dashboard.tsx', 'apps/web/src/Chart.tsx', 'apps/web/src/Filters.tsx', 'apps/web/src/styles.css'],
