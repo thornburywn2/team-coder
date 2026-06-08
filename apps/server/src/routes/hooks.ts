@@ -1,12 +1,13 @@
 import { Hono } from 'hono';
 import { basename } from 'node:path';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, gte, isNotNull, ne, sql } from 'drizzle-orm';
 import { HookEventSchema, type HookEventPayload } from '@team-coder/shared';
 import { db, schema } from '../db';
 import { devAuth, type Developer } from '../auth';
 import { scrubSecrets } from '../lib/scrub';
 import { pushFeed, type FeedItem } from '../feed';
 import { touchHook } from '../connections';
+import { COLLISION_WINDOW_MS, recordCollision } from '../collisions';
 
 // Claude Code hook ingestion. Each coder's agent POSTs lifecycle events here with
 // their personal Bearer token (devAuth -> developer). We persist the raw event,
@@ -88,6 +89,33 @@ async function ingest(dev: Developer, ev: HookEventPayload): Promise<void> {
 
   const feed = feedFor(dev, ev, file, scrubbedPrompt);
   if (feed) pushFeed(dev.projectId, feed);
+
+  // advisory concurrent-edit detection: another coder touched this same file recently?
+  if (file && ev.hook_event_name === 'PreToolUse') await detectCollision(dev, file);
+}
+
+async function detectCollision(dev: Developer, file: string): Promise<void> {
+  const since = new Date(Date.now() - COLLISION_WINDOW_MS);
+  const rows = await db
+    .selectDistinct({ developerId: schema.hookEvents.developerId })
+    .from(schema.hookEvents)
+    .where(and(
+      eq(schema.hookEvents.projectId, dev.projectId),
+      eq(schema.hookEvents.filePath, file),
+      gte(schema.hookEvents.ts, since),
+      isNotNull(schema.hookEvents.developerId),
+      ne(schema.hookEvents.developerId, dev.id),
+    ));
+  if (!rows.length) return;
+
+  const otherIds = rows.map((r) => r.developerId!).filter(Boolean);
+  const people = await db
+    .select({ id: schema.users.id, displayName: schema.users.displayName, username: schema.users.username })
+    .from(schema.users)
+    .where(eq(schema.users.projectId, dev.projectId));
+  const nameOf = (id: string) => { const u = people.find((p) => p.id === id); return u ? (u.displayName ?? u.username) : '?'; };
+  const developers = [dev.id, ...otherIds].map((id) => ({ id, name: nameOf(id) }));
+  recordCollision(dev.projectId, file, developers);
 }
 
 function feedFor(

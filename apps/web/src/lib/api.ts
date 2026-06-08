@@ -245,6 +245,12 @@ export interface ModuleOwnership {
   contributors: { developerId: string; name: string; edits: number }[];
 }
 
+export interface CollisionWarning {
+  file: string;
+  developers: { id: string; name: string }[];
+  ts: number;
+}
+
 export interface FeedItem {
   id: string;
   ts: number;

@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { WsMessage } from '@team-coder/shared';
-import { api, type FeedItem, type ModuleOwnership, type PresenceRow, type ProjectInfo } from '../lib/api';
+import { api, type CollisionWarning, type FeedItem, type ModuleOwnership, type PresenceRow, type ProjectInfo } from '../lib/api';
 import { queryClient } from '../lib/query';
 import { connectSocket, onMessage } from '../lib/socket';
 import { useStore } from '../store';
 import { Board } from './Board';
 import { ProjectHeader } from './ProjectHeader';
+import { Collisions } from './Collisions';
 import { Ownership } from './Ownership';
 import { Feed } from './Feed';
 import { Notes } from './Notes';
@@ -17,7 +18,7 @@ import { Patterns } from './Patterns';
 import { Connect } from './Connect';
 
 export function Dashboard() {
-  const { token, connected, setConnected, hydratePresence, applyPresence, hydrateFeed, pushFeed, setOwnership, logout } =
+  const { token, connected, setConnected, hydratePresence, applyPresence, hydrateFeed, pushFeed, setOwnership, hydrateCollisions, pushCollision, logout } =
     useStore();
   const [view, setView] = useState<'board' | 'proposals' | 'patterns' | 'report' | 'connect'>('board');
   const { data: project } = useQuery({ queryKey: ['project'], queryFn: () => api<ProjectInfo>('/projects/current') });
@@ -28,6 +29,7 @@ export function Dashboard() {
     // hydrate live state once
     void api<PresenceRow[]>('/presence').then(hydratePresence).catch(() => {});
     void api<FeedItem[]>('/feed').then(hydrateFeed).catch(() => {});
+    void api<CollisionWarning[]>('/collisions').then(hydrateCollisions).catch(() => {});
 
     // wire the socket dispatcher
     const off = onMessage((msg: WsMessage) => {
@@ -40,6 +42,9 @@ export function Dashboard() {
           break;
         case 'OWNERSHIP_UPDATE':
           setOwnership(msg.payload as ModuleOwnership[]);
+          break;
+        case 'COLLISION_WARNING':
+          pushCollision(msg.payload as CollisionWarning);
           break;
         case 'TASK_CREATED':
         case 'TASK_UPDATED':
@@ -89,6 +94,7 @@ export function Dashboard() {
       {view === 'board' ? (
         <main>
           <div className="col-main">
+            <Collisions />
             <ProjectHeader />
             <Board />
             <Tasks />

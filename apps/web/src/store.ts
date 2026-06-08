@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { FeedItem, ModuleOwnership, PresenceRow } from './lib/api';
+import type { CollisionWarning, FeedItem, ModuleOwnership, PresenceRow } from './lib/api';
 
 // Ephemeral live state (presence + feed + connection), updated by the WebSocket.
 // Auth identity (token + which coder you are) is persisted to localStorage.
@@ -11,6 +11,7 @@ interface Store {
   presence: Record<string, PresenceRow>;
   feed: FeedItem[];
   ownership: ModuleOwnership[];
+  collisions: CollisionWarning[];
 
   setAuth: (token: string, meId: string) => void;
   logout: () => void;
@@ -20,6 +21,8 @@ interface Store {
   hydrateFeed: (items: FeedItem[]) => void;
   pushFeed: (item: FeedItem) => void;
   setOwnership: (o: ModuleOwnership[]) => void;
+  hydrateCollisions: (c: CollisionWarning[]) => void;
+  pushCollision: (c: CollisionWarning) => void;
 }
 
 export const useStore = create<Store>((set) => ({
@@ -29,6 +32,7 @@ export const useStore = create<Store>((set) => ({
   presence: {},
   feed: [],
   ownership: [],
+  collisions: [],
 
   setAuth: (token, meId) => {
     localStorage.setItem('tc_token', token);
@@ -38,7 +42,7 @@ export const useStore = create<Store>((set) => ({
   logout: () => {
     localStorage.removeItem('tc_token');
     localStorage.removeItem('tc_me');
-    set({ token: null, meId: null, connected: false, presence: {}, feed: [], ownership: [] });
+    set({ token: null, meId: null, connected: false, presence: {}, feed: [], ownership: [], collisions: [] });
   },
   setConnected: (connected) => set({ connected }),
   hydratePresence: (rows) =>
@@ -48,4 +52,8 @@ export const useStore = create<Store>((set) => ({
   hydrateFeed: (items) => set({ feed: items }),
   pushFeed: (item) => set((s) => ({ feed: [item, ...s.feed].slice(0, 100) })),
   setOwnership: (ownership) => set({ ownership }),
+  hydrateCollisions: (collisions) => set({ collisions }),
+  // newest first, one entry per file (latest wins), keep a small recent set
+  pushCollision: (c) =>
+    set((s) => ({ collisions: [c, ...s.collisions.filter((w) => w.file !== c.file)].slice(0, 20) })),
 }));

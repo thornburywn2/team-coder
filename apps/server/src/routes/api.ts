@@ -3,6 +3,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import { db, schema } from '../db';
 import { teamAuth, type Project } from '../auth';
 import { getConnection, getConnections } from '../connections';
+import { recentCollisions } from '../collisions';
 import { recentFeed } from '../feed';
 import { computeOwnership } from '../ownership';
 import { buildReport } from '../report';
@@ -52,6 +53,9 @@ apiRoutes.post('/projects/current/decompose', async (c) => {
 
 // live activity feed (in-memory ring buffer, most-recent-first), this project only
 apiRoutes.get('/feed', (c) => c.json(recentFeed(c.get('project').id)));
+
+// advisory concurrent-edit warnings (active, non-expired) for this project
+apiRoutes.get('/collisions', (c) => c.json(recentCollisions(c.get('project').id)));
 
 apiRoutes.get('/presence', async (c) =>
   c.json(await db.select().from(schema.userPresence).where(eq(schema.userPresence.projectId, c.get('project').id))),

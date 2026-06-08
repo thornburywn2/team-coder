@@ -178,6 +178,14 @@ main { display: grid; grid-template-columns: 1fr 360px; gap: 1rem; align-items: 
 
 .muted { color: var(--muted); }
 
+/* ── Collision warnings (advisory concurrent-edit banner) ─ */
+.collisions { background: rgba(245,166,35,0.1); border-color: var(--amber); display: flex; flex-direction: column; gap: 0.4rem; padding: 0.6rem 0.8rem; }
+.collision { display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; }
+.collision-icon { flex: none; }
+.collision-who { font-weight: 700; }
+.collision-text { color: var(--muted); }
+.collision-file { color: var(--amber); word-break: break-all; }
+
 /* ── Login extras (create project) ─────────────────────── */
 .link-btn { background: none !important; border: none !important; color: var(--accent); padding: 0.5rem 0 0 !important; width: auto !important; font-weight: 500; cursor: pointer; font-size: 0.85rem; }
 .created p { margin: 0 0 0.75rem; }
