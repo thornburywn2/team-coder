@@ -2,6 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { api, type Breakdown, type Report as ReportData } from '../lib/api';
 import { downloadFile, reportToMarkdown } from '../lib/report-export';
 import { fmtTokens } from './Kpis';
+import { Burndown } from './Burndown';
+import { TokenTrend } from './TokenTrend';
+import { TokenUsage } from './TokenUsage';
+import { Awards } from './Awards';
 
 const PALETTE = ['#5b8cff', '#3cb44b', '#f5a623', '#e6194B', '#911eb4', '#42d4f4', '#f032e6', '#bfef45', '#fabed4', '#469990'];
 
@@ -138,6 +142,14 @@ export function Report() {
           </div>
         </section>
       )}
+
+      {/* metrics moved off the live board: trends + per-person usage + awards */}
+      <div className="report-cols">
+        <Burndown />
+        <TokenTrend />
+      </div>
+      <TokenUsage />
+      <Awards />
     </div>
   );
 }

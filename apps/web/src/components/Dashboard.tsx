@@ -16,12 +16,9 @@ import { Tasks } from './Tasks';
 import { Blockers } from './Blockers';
 import { LiveAgents } from './LiveAgents';
 import { ProposalsWidget } from './ProposalsWidget';
-import { Awards } from './Awards';
 import { RepoStatus } from './RepoStatus';
-import { Burndown } from './Burndown';
 import { MyWork } from './MyWork';
 import { StaleTasks } from './StaleTasks';
-import { TokenTrend } from './TokenTrend';
 import { Locks } from './Locks';
 import { Report } from './Report';
 import { Decisions } from './Proposals';
@@ -130,12 +127,7 @@ export function Dashboard() {
             <div className="w6"><Blockers /></div>
             <div className="w6"><StaleTasks /></div>
 
-            {/* Trends: progress + spend over time */}
-            <div className="w12 section-label" title="Progress and token spend over time">📈 Trends</div>
-            <div className="w6"><Burndown /></div>
-            <div className="w6"><TokenTrend /></div>
-
-            {/* The work: who's on what, the full backlog, decisions, context */}
+            {/* The work: who's on what, the full backlog, decisions, coordination */}
             <div className="w12 section-label" title="Live team activity, the full backlog, decisions, and coordination">📋 The work</div>
             <div className="w8"><Board /></div>
             <div className="w4"><LiveAgents /></div>
@@ -147,8 +139,6 @@ export function Dashboard() {
             <div className="w6"><ProposalsWidget /></div>
             <div className="w6"><Decisions /></div>
             <div className="w6"><Feed /></div>
-            <div className="w6"><Awards /></div>
-            <div className="w6"><TokenUsage /></div>
             <div className="w6"><Locks /></div>
 
             {/* Reuse kit — the shared pattern library, folded onto the board */}

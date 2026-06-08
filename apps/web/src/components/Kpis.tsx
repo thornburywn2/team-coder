@@ -23,7 +23,6 @@ export function Kpis() {
     { label: 'agents live', value: s.liveAgents, sub: `${s.liveSessions} sessions`, tone: 'accent', tip: `${s.liveAgents} coder(s) with an agent active in the last 5 min (${s.liveSessions} session(s))` },
     { label: 'open proposals', value: s.openProposals, sub: 'to decide', tone: s.openProposals > 0 ? 'amber' : 'gray', tip: `${s.openProposals} proposal(s) awaiting a decision — vote in "Needs a vote"` },
     { label: 'commits', value: s.commits, sub: `+${s.linesAdded.toLocaleString()} lines`, tone: 'accent', tip: `${s.commits} commits ingested from the repo, +${s.linesAdded.toLocaleString()} lines added` },
-    { label: 'tokens', value: fmtTokens(s.tokens), sub: 'used', tone: 'accent', tip: `${s.tokens.toLocaleString()} total tokens (input+output) across the team — track + minimize` },
   ];
   return (
     <div className="kpis">
