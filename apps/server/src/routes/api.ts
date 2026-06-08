@@ -63,8 +63,8 @@ apiRoutes.post('/projects/current/decompose', async (c) => {
   return c.json({ candidates, mode });
 });
 
-// live activity feed (in-memory ring buffer, most-recent-first), this project only
-apiRoutes.get('/feed', (c) => c.json(recentFeed(c.get('project').id)));
+// live activity feed (durable, most-recent-first), this project only
+apiRoutes.get('/feed', async (c) => c.json(await recentFeed(c.get('project').id)));
 
 // advisory concurrent-edit warnings (active, non-expired) for this project
 apiRoutes.get('/collisions', (c) => c.json(recentCollisions(c.get('project').id)));

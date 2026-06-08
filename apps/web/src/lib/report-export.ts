@@ -24,6 +24,12 @@ export function reportToMarkdown(r: Report): string {
   }
 
   const basis = r.analysisBasis === 'lines' ? 'lines' : 'edits';
+  const top = (xs: { name: string; pct: number }[]) => xs.slice(0, 4).map((x) => `${x.name} ${x.pct}%`).join(', ') || '—';
+  lines.push(`\n## Language & stack by coder (by ${basis})\n`);
+  for (const c of r.coders) {
+    lines.push(`- **${c.name}** — langs: ${top(c.languages)} · stack: ${top(c.layers)}`);
+  }
+
   if (r.languages.length) {
     lines.push(`\n## Languages (by ${basis})\n`);
     for (const l of r.languages) lines.push(`- ${l.name}: ${l.pct}% (${l.value} ${basis})`);

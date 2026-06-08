@@ -273,3 +273,20 @@ export const sessions = pgTable('sessions', {
   promptCount: integer('prompt_count').notNull().default(0),
   toolCount: integer('tool_count').notNull().default(0),
 });
+
+// Durable activity feed — every high-signal event, kept for the whole project so a
+// multi-day hackathon's history survives restarts/redeploys and stays reportable.
+// (The live WebSocket still broadcasts immediately; this is the persistent record.)
+export const feedItems = pgTable('feed_items', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  projectId: pid(),
+  ts: timestamp('ts', { withTimezone: true }).notNull().defaultNow(),
+  developerId: uuid('developer_id'),
+  developer: varchar('developer', { length: 100 }),
+  color: varchar('color', { length: 20 }),
+  kind: varchar('kind', { length: 30 }).notNull(),
+  detail: text('detail'),
+  file: text('file'),
+}, (t) => ({
+  projectIdx: index('idx_feed_project').on(t.projectId, t.ts),
+}));

@@ -25,6 +25,8 @@ export interface CoderStat {
   patterns: number;
   modulesOwned: number;
   pct: { lines: number; commits: number; tasks: number; edits: number; blended: number };
+  languages: Breakdown[]; // this coder's language mix
+  layers: Breakdown[]; // this coder's frontend/backend/database/infra/docs mix
 }
 
 export interface ModuleStat {
@@ -50,6 +52,7 @@ export interface Report {
   coders: CoderStat[];
   modules: ModuleStat[];
   timeline: TimelineBucket[];
+  timelineUnit: 'hour' | 'day'; // daily buckets once the project spans >2 days
   languages: Breakdown[]; // what the team writes in
   layers: Breakdown[]; // where in the stack: frontend/backend/database/infra/docs
   analysisBasis: 'lines' | 'edits'; // git LOC if available, else live hook edits
@@ -86,14 +89,14 @@ export async function buildReport(projectId: string, generatedAt: string): Promi
         .select({ bucket: sql<string>`to_char(date_trunc('hour', ${schema.hookEvents.ts}), 'YYYY-MM-DD"T"HH24:00')`, dev: schema.hookEvents.developerId, n: count() })
         .from(schema.hookEvents).where(and(eq(schema.hookEvents.projectId, projectId), isNotNull(schema.hookEvents.developerId))).groupBy(sql`1`, schema.hookEvents.developerId).orderBy(sql`1`),
       computeOwnership(projectId, 60 * 24 * 14), // 2-week window: "owned" for the whole event
-      // raw file paths for language/layer analysis: git LOC (authoritative) +
-      // hook edits (fallback so the breakdown is non-empty before git is configured)
+      // raw file paths PER developer for language/layer analysis: git LOC
+      // (authoritative) + hook edits (fallback before git is configured)
       db
-        .select({ filePath: schema.gitFileChanges.filePath, lines: sql<number>`coalesce(sum(${schema.gitFileChanges.additions}),0)` })
-        .from(schema.gitFileChanges).where(eq(schema.gitFileChanges.projectId, projectId)).groupBy(schema.gitFileChanges.filePath),
+        .select({ dev: schema.gitFileChanges.developerId, filePath: schema.gitFileChanges.filePath, lines: sql<number>`coalesce(sum(${schema.gitFileChanges.additions}),0)` })
+        .from(schema.gitFileChanges).where(eq(schema.gitFileChanges.projectId, projectId)).groupBy(schema.gitFileChanges.developerId, schema.gitFileChanges.filePath),
       db
-        .select({ filePath: schema.hookEvents.filePath, n: count() })
-        .from(schema.hookEvents).where(and(eq(schema.hookEvents.projectId, projectId), isNotNull(schema.hookEvents.filePath))).groupBy(schema.hookEvents.filePath),
+        .select({ dev: schema.hookEvents.developerId, filePath: schema.hookEvents.filePath, n: count() })
+        .from(schema.hookEvents).where(and(eq(schema.hookEvents.projectId, projectId), isNotNull(schema.hookEvents.filePath))).groupBy(schema.hookEvents.developerId, schema.hookEvents.filePath),
     ]);
   const [gitFilesAgg, hookFilesAgg] = [extra1, extra2];
 
@@ -107,6 +110,22 @@ export async function buildReport(projectId: string, generatedAt: string): Promi
   const pats = byDev(patAgg);
   const ownedCount = new Map<string, number>();
   for (const m of ownership) if (m.ownerId) ownedCount.set(m.ownerId, (ownedCount.get(m.ownerId) ?? 0) + 1);
+
+  // per-file weights (git LOC, else live hook edits) for language/layer analysis
+  const useGit = gitFilesAgg.length > 0;
+  const analysisBasis: 'lines' | 'edits' = useGit ? 'lines' : 'edits';
+  const fileRows = useGit
+    ? gitFilesAgg.map((r) => ({ dev: r.dev as string | null, file: r.filePath, w: num(r.lines) }))
+    : hookFilesAgg.filter((r) => r.filePath).map((r) => ({ dev: r.dev as string | null, file: r.filePath as string, w: num(r.n) }));
+  const breakdown = (rows: { file: string; w: number }[], key: (f: string) => string): Breakdown[] => {
+    const m = new Map<string, number>();
+    for (const { file, w } of rows) m.set(key(file), (m.get(key(file)) ?? 0) + w);
+    const total = [...m.values()].reduce((a, b) => a + b, 0);
+    return [...m.entries()]
+      .map(([name, value]) => ({ name, value, pct: total > 0 ? Math.round((value / total) * 1000) / 10 : 0 }))
+      .sort((a, b) => b.value - a.value);
+  };
+  const devRows = (id: string) => fileRows.filter((r) => r.dev === id).map((r) => ({ file: r.file, w: r.w }));
 
   const coders: CoderStat[] = users.map((u) => ({
     id: u.id,
@@ -125,6 +144,8 @@ export async function buildReport(projectId: string, generatedAt: string): Promi
     patterns: num(pats.get(u.id)?.n),
     modulesOwned: ownedCount.get(u.id) ?? 0,
     pct: { lines: 0, commits: 0, tasks: 0, edits: 0, blended: 0 },
+    languages: breakdown(devRows(u.id), languageOf),
+    layers: breakdown(devRows(u.id), layerOf),
   }));
 
   // contribution % across multiple bases (each base normalized across the team)
@@ -162,38 +183,33 @@ export async function buildReport(projectId: string, generatedAt: string): Promi
     return { name: m.name, pathPrefix: m.pathPrefix, totalLines: total, contributors };
   });
 
-  // timeline buckets
-  const bucketSet = [...new Set(timelineAgg.map((r) => r.bucket))].sort();
-  const timeline: TimelineBucket[] = bucketSet.map((t) => {
-    const perCoder: Record<string, number> = {};
-    for (const r of timelineAgg) {
-      if (r.bucket === t && r.dev) perCoder[nameOf.get(r.dev) ?? '?'] = num(r.n);
-    }
-    return { t, perCoder };
-  });
+  // timeline — hourly, but collapsed to DAILY for multi-day projects so a
+  // week(s)-long hackathon report stays readable (a week = 168 hourly bars).
+  const hourKeys = [...new Set(timelineAgg.map((r) => r.bucket))].sort();
+  const spanDays = hourKeys.length > 1 ? (new Date(hourKeys[hourKeys.length - 1]!).getTime() - new Date(hourKeys[0]!).getTime()) / 86_400_000 : 0;
+  const timelineUnit: 'hour' | 'day' = spanDays > 2 ? 'day' : 'hour';
+  const tlMap = new Map<string, Record<string, number>>();
+  for (const r of timelineAgg) {
+    if (!r.dev) continue;
+    const k = timelineUnit === 'day' ? r.bucket.slice(0, 10) : r.bucket;
+    const pc = tlMap.get(k) ?? {};
+    const name = nameOf.get(r.dev) ?? '?';
+    pc[name] = (pc[name] ?? 0) + num(r.n);
+    tlMap.set(k, pc);
+  }
+  const timeline: TimelineBucket[] = [...tlMap.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([t, perCoder]) => ({ t, perCoder }));
 
-  // language + layer breakdown — git LOC if we have any, else live hook edits
-  const useGit = gitFilesAgg.length > 0;
-  const analysisBasis: 'lines' | 'edits' = useGit ? 'lines' : 'edits';
-  const files2 = useGit
-    ? gitFilesAgg.map((r) => ({ file: r.filePath, w: num(r.lines) }))
-    : hookFilesAgg.filter((r) => r.filePath).map((r) => ({ file: r.filePath as string, w: num(r.n) }));
-  const tally = (key: (f: string) => string): Breakdown[] => {
-    const m = new Map<string, number>();
-    for (const { file, w } of files2) m.set(key(file), (m.get(key(file)) ?? 0) + w);
-    const total = [...m.values()].reduce((a, b) => a + b, 0);
-    return [...m.entries()]
-      .map(([name, value]) => ({ name, value, pct: pctOf(value, total) }))
-      .sort((a, b) => b.value - a.value);
-  };
+  // team-level language + layer breakdown (same weights as per-coder)
+  const teamRows = fileRows.map((r) => ({ file: r.file, w: r.w }));
 
   return {
     generatedAt,
     coders,
     modules,
     timeline,
-    languages: tally(languageOf),
-    layers: tally(layerOf),
+    timelineUnit,
+    languages: breakdown(teamRows, languageOf),
+    layers: breakdown(teamRows, layerOf),
     analysisBasis,
     totals: { commits: totCommits, linesAdded: totLines, tasksCompleted: totTasks, activeMinutes: sum((c) => c.activeMinutes) },
   };

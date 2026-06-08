@@ -52,12 +52,24 @@ try {
   check(adaAgents.every((a) => a.filesTouched >= 1 && a.tools >= 1), 'agents carry per-agent stats (files + tools)');
 
   // report language + layer analysis from hook edits (no git → edit basis)
-  const report = (await (await fetch(`${BASE}/api/report`, { headers: hdr(proj.token) })).json()) as { languages: Array<{ name: string }>; layers: Array<{ name: string }>; analysisBasis: string };
+  interface CoderB { name: string; languages: Array<{ name: string }>; layers: Array<{ name: string }> }
+  const report = (await (await fetch(`${BASE}/api/report`, { headers: hdr(proj.token) })).json()) as { languages: Array<{ name: string }>; layers: Array<{ name: string }>; analysisBasis: string; coders: CoderB[] };
   check(report.analysisBasis === 'edits', `report falls back to edit basis without git (got ${report.analysisBasis})`);
   const langs = report.languages.map((l) => l.name);
-  check(['TypeScript', 'Python', 'SQL'].every((l) => langs.includes(l)), `languages detected: ${langs.join(', ')}`);
+  check(['TypeScript', 'Python', 'SQL'].every((l) => langs.includes(l)), `team languages detected: ${langs.join(', ')}`);
   const layers = report.layers.map((l) => l.name);
-  check(['frontend', 'backend', 'database'].every((l) => layers.includes(l)), `layers detected: ${layers.join(', ')}`);
+  check(['frontend', 'backend', 'database'].every((l) => layers.includes(l)), `team layers detected: ${layers.join(', ')}`);
+
+  // PER-CODER breakdown: Ada did frontend+backend (TS+Python); Grace did database (SQL)
+  const ada2 = report.coders.find((c) => c.name === 'Ada Lovelace');
+  const grace2 = report.coders.find((c) => c.name === 'Grace Hopper');
+  const aLangs = (ada2?.languages ?? []).map((l) => l.name);
+  const aLayers = (ada2?.layers ?? []).map((l) => l.name);
+  check(aLangs.includes('TypeScript') && aLangs.includes('Python'), `Ada's languages: ${aLangs.join(', ')}`);
+  check(aLayers.includes('frontend') && aLayers.includes('backend'), `Ada's layers: ${aLayers.join(', ')}`);
+  const gLangs = (grace2?.languages ?? []).map((l) => l.name);
+  check(gLangs.includes('SQL') && !gLangs.includes('TypeScript'), `Grace's languages isolated to her work: ${gLangs.join(', ')}`);
+  check((grace2?.layers ?? []).some((l) => l.name === 'database'), `Grace's layers include database`);
 } catch (err) {
   console.error('❌', err instanceof Error ? err.message : err);
   ok = false;

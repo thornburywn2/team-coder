@@ -80,6 +80,12 @@ export function Report() {
                 {c.decisions > 0 && <span>{c.decisions} ADRs</span>}
                 {c.patterns > 0 && <span>{c.patterns} patterns</span>}
               </div>
+              {(c.languages.length > 0 || c.layers.length > 0) && (
+                <div className="coder-mix">
+                  {c.layers.slice(0, 5).map((l) => <span key={`y-${l.name}`} className="chip chip-layer">{l.name} {l.pct}%</span>)}
+                  {c.languages.slice(0, 5).map((l) => <span key={`l-${l.name}`} className="chip chip-lang">{l.name} {l.pct}%</span>)}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -117,7 +123,7 @@ export function Report() {
 
       {report.timeline.length > 0 && (
         <section className="panel">
-          <h2>Activity timeline <span className="muted small">events per hour</span></h2>
+          <h2>Activity timeline <span className="muted small">events per {report.timelineUnit}</span></h2>
           <div className="timeline">
             {report.timeline.map((b) => {
               const total = Object.values(b.perCoder).reduce((a, n) => a + n, 0);

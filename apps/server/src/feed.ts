@@ -1,12 +1,11 @@
+import { desc, eq } from 'drizzle-orm';
 import { publish } from './state';
+import { db, schema } from './db';
 
-// Live activity feed — an in-memory ring buffer of recent, high-signal events
-// derived from hooks + claims. Ephemeral by design (hackathon scale); the DB
-// activity_events table is reserved for durable domain audit in later phases.
-//
-// Partitioned by project: each project gets its own ring so feeds never bleed
-// across projects, and every emitted message is tagged with its projectId so the
-// WebSocket layer only fans it out to that project's sockets.
+// Live activity feed — high-signal events from hooks + claims + proposals etc.
+// DURABLE: every item is persisted (feed_items) so a multi-day project's history
+// survives restarts/redeploys and the whole timeframe is captured. The WebSocket
+// still broadcasts immediately for the live view; the DB is the record of truth.
 
 export interface FeedItem {
   id: string;
@@ -20,22 +19,26 @@ export interface FeedItem {
   file?: string;
 }
 
-const RINGS = new Map<string, FeedItem[]>();
-const CAPACITY = 100;
-let seq = 0;
-
 export function pushFeed(
   projectId: string,
   item: Omit<FeedItem, 'id' | 'ts' | 'projectId'> & { ts?: number },
 ): FeedItem {
-  const full: FeedItem = { id: String(++seq), ts: item.ts ?? Date.now(), projectId, ...item };
-  let ring = RINGS.get(projectId);
-  if (!ring) {
-    ring = [];
-    RINGS.set(projectId, ring);
-  }
-  ring.push(full);
-  if (ring.length > CAPACITY) ring.shift();
+  const full: FeedItem = { id: crypto.randomUUID(), ts: item.ts ?? Date.now(), projectId, ...item };
+  // persist (fire-and-forget — never block the hot path); broadcast live
+  void db
+    .insert(schema.feedItems)
+    .values({
+      id: full.id,
+      projectId,
+      ts: new Date(full.ts),
+      developerId: full.developerId ?? null,
+      developer: full.developer ?? null,
+      color: full.color ?? null,
+      kind: full.kind,
+      detail: full.detail ?? null,
+      file: full.file ?? null,
+    })
+    .catch((err) => console.error('[feed] persist failed:', err));
   publish({
     type: 'ACTIVITY_EVENT',
     payload: full,
@@ -44,7 +47,23 @@ export function pushFeed(
   return full;
 }
 
-/** Most-recent-first snapshot for hydration, scoped to one project. */
-export function recentFeed(projectId: string): FeedItem[] {
-  return [...(RINGS.get(projectId) ?? [])].reverse();
+/** Most-recent-first feed for hydration, scoped to one project (durable read). */
+export async function recentFeed(projectId: string, limit = 200): Promise<FeedItem[]> {
+  const rows = await db
+    .select()
+    .from(schema.feedItems)
+    .where(eq(schema.feedItems.projectId, projectId))
+    .orderBy(desc(schema.feedItems.ts))
+    .limit(limit);
+  return rows.map((r) => ({
+    id: r.id,
+    ts: new Date(r.ts).getTime(),
+    projectId,
+    developerId: r.developerId ?? undefined,
+    developer: r.developer ?? undefined,
+    color: r.color ?? undefined,
+    kind: r.kind as FeedItem['kind'],
+    detail: r.detail ?? undefined,
+    file: r.file ?? undefined,
+  }));
 }

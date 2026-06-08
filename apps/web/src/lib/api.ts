@@ -141,6 +141,8 @@ export interface CoderStat {
   patterns: number;
   modulesOwned: number;
   pct: { lines: number; commits: number; tasks: number; edits: number; blended: number };
+  languages: Breakdown[];
+  layers: Breakdown[];
 }
 
 export interface ModuleStat {
@@ -161,6 +163,7 @@ export interface Report {
   coders: CoderStat[];
   modules: ModuleStat[];
   timeline: { t: string; perCoder: Record<string, number> }[];
+  timelineUnit: 'hour' | 'day';
   languages: Breakdown[];
   layers: Breakdown[];
   analysisBasis: 'lines' | 'edits';
