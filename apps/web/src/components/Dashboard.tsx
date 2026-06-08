@@ -8,10 +8,14 @@ import { useStore } from '../store';
 import { Board } from './Board';
 import { ProjectHeader } from './ProjectHeader';
 import { Collisions } from './Collisions';
+import { Kpis } from './Kpis';
 import { Ownership } from './Ownership';
 import { Feed } from './Feed';
 import { Notes } from './Notes';
 import { Tasks } from './Tasks';
+import { Blockers } from './Blockers';
+import { LiveAgents } from './LiveAgents';
+import { OpenProposals } from './OpenProposals';
 import { Report } from './Report';
 import { Proposals } from './Proposals';
 import { Patterns } from './Patterns';
@@ -51,6 +55,7 @@ export function Dashboard() {
         case 'TASK_UPDATED':
         case 'TASK_DELETED':
           void queryClient.invalidateQueries({ queryKey: ['tasks'] });
+          void queryClient.invalidateQueries({ queryKey: ['summary'] });
           break;
         case 'NOTE_ADDED':
           void queryClient.invalidateQueries({ queryKey: ['notes'] });
@@ -94,19 +99,25 @@ export function Dashboard() {
         <button className="logout" onClick={logout}>sign out</button>
       </header>
       {view === 'board' ? (
-        <main>
-          <div className="col-main">
+        <div className="board-view">
+          <div className="board-top">
             <Collisions />
             <ProjectHeader />
-            <Board />
-            <Tasks />
+            <Kpis />
           </div>
-          <div className="col-side">
-            <Ownership />
-            <Notes />
-            <Feed />
+          <div className="board-grid">
+            <div className="w8"><Board /></div>
+            <div className="w4"><LiveAgents /></div>
+            <div className="w8"><Tasks /></div>
+            <div className="w4 col-stack">
+              <Blockers />
+              <OpenProposals onOpen={() => setView('proposals')} />
+            </div>
+            <div className="w6"><Notes /></div>
+            <div className="w6"><Feed /></div>
+            <div className="w12"><Ownership /></div>
           </div>
-        </main>
+        </div>
       ) : view === 'proposals' ? (
         <Proposals />
       ) : view === 'patterns' ? (

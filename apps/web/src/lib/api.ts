@@ -298,6 +298,20 @@ export interface ModuleOwnership {
   contributors: { developerId: string; name: string; edits: number }[];
 }
 
+export interface Summary {
+  tasks: { total: number; done: number; blocked: number; inProgress: number };
+  activeCoders: number;
+  liveAgents: number;
+  liveSessions: number;
+  openProposals: number;
+  commits: number;
+  linesAdded: number;
+}
+
+export function getSummary() {
+  return api<Summary>('/summary');
+}
+
 export interface CollisionWarning {
   file: string;
   developers: { id: string; name: string }[];

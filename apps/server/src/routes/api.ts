@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { and, count, desc, eq, gte, inArray, isNotNull } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, isNotNull, sql } from 'drizzle-orm';
 import { db, schema } from '../db';
 import { teamAuth, type Project } from '../auth';
 import { getConnection, getConnections } from '../connections';
@@ -73,6 +73,30 @@ apiRoutes.post('/projects/current/decompose', async (c) => {
   }
   if (!candidates?.length) candidates = decomposePrd(prd, mods);
   return c.json({ candidates, mode });
+});
+
+// at-a-glance KPIs for the board header strip (one cheap call)
+apiRoutes.get('/summary', async (c) => {
+  const pid = c.get('project').id;
+  const since = new Date(Date.now() - 5 * 60_000);
+  const [taskAgg, presence, liveAgents, openProps, git] = await Promise.all([
+    db.select({ status: schema.tasks.status, n: count() }).from(schema.tasks).where(eq(schema.tasks.projectId, pid)).groupBy(schema.tasks.status),
+    db.select({ status: schema.userPresence.status }).from(schema.userPresence).where(eq(schema.userPresence.projectId, pid)),
+    db.select({ dev: schema.sessions.developerId }).from(schema.sessions).where(and(eq(schema.sessions.projectId, pid), isNotNull(schema.sessions.developerId), gte(schema.sessions.lastSeenAt, since))),
+    db.select({ n: count() }).from(schema.proposals).where(and(eq(schema.proposals.projectId, pid), eq(schema.proposals.status, 'open'))),
+    db.select({ commits: count(), lines: sql<number>`coalesce(sum(${schema.gitCommits.additions}),0)` }).from(schema.gitCommits).where(eq(schema.gitCommits.projectId, pid)),
+  ]);
+  const tByStatus = Object.fromEntries(taskAgg.map((r) => [r.status, Number(r.n)]));
+  const total = taskAgg.reduce((a, r) => a + Number(r.n), 0);
+  return c.json({
+    tasks: { total, done: tByStatus['done'] ?? 0, blocked: tByStatus['blocked'] ?? 0, inProgress: tByStatus['in_progress'] ?? 0 },
+    activeCoders: presence.filter((p) => p.status === 'active').length,
+    liveAgents: new Set(liveAgents.map((s) => s.dev)).size,
+    liveSessions: liveAgents.length,
+    openProposals: Number(openProps[0]?.n ?? 0),
+    commits: Number(git[0]?.commits ?? 0),
+    linesAdded: Number(git[0]?.lines ?? 0),
+  });
 });
 
 // live activity feed (durable, most-recent-first), this project only

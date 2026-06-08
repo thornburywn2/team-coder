@@ -50,7 +50,7 @@ try {
   const commits = await db
     .select({ developerId: schema.gitCommits.developerId, additions: schema.gitCommits.additions })
     .from(schema.gitCommits)
-    .where(eq(schema.gitCommits.authorEmail, 'carol@teamcoder.dev'));
+    .where(and(eq(schema.gitCommits.projectId, projectId), eq(schema.gitCommits.authorEmail, 'carol@teamcoder.dev')));
   check(commits.length >= 2, `git_commits has Carol's commits (${commits.length})`);
   check(!!carol && commits.every((c) => c.developerId === carol.id), 'commits mapped to Carol by email');
 
@@ -58,7 +58,7 @@ try {
     .select({ moduleId: schema.gitFileChanges.moduleId })
     .from(schema.gitFileChanges)
     .innerJoin(schema.gitCommits, eq(schema.gitFileChanges.sha, schema.gitCommits.sha))
-    .where(and(eq(schema.gitCommits.authorEmail, 'carol@teamcoder.dev')));
+    .where(and(eq(schema.gitCommits.projectId, projectId), eq(schema.gitCommits.authorEmail, 'carol@teamcoder.dev')));
   const sharedMod = (await db.select().from(schema.modules).where(and(eq(schema.modules.projectId, projectId), eq(schema.modules.pathPrefix, 'packages/shared/'))))[0];
   check(changes.some((c) => c.moduleId === sharedMod?.id), 'file changes mapped to the shared module');
 
