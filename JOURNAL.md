@@ -4,6 +4,39 @@
 
 ---
 
+## 2026-06-08 (k) — Resolve ALL gap sections (production hardening)
+
+**Scope:** GAPS §1,§3,§4,§5-branch,§6,§7,§8,§9,§10,§11 (every remaining item)
+**Outcome:** SUCCESS — all 11 gap sections ✅
+
+- **§1 Security:** rate limiting (lib/ratelimit), security headers + CORS
+  (lib/security), ADMIN_TOKEN project-create gate, deep secret scrub, token
+  rotation/revocation, boot warnings.
+- **§3 Coordination:** work_locks persisted (migration 0012); PreToolUse auto-acquires,
+  Stop releases — no opt-in needed.
+- **§4 Scale:** ?limit/?offset pagination (lib/paginate); locks durable.
+- **§5 Git:** branch awareness (GET /api/repo/branches, ahead/behind) → proposals show
+  "✓ proven"; force-push mirror reset; log cap 5000.
+- **§6 Testing/CI:** .github/workflows/ci.yml (Postgres → typecheck + unit + build +
+  migrate/seed + verify:all); 17 bun:test unit tests.
+- **§7 Metrics:** tasks.completed_at (0013), 4h session cap, ?days time-range filter.
+- **§8 Ops:** Caddy TLS proxy + pg_dump backups (--profile prod), prod-deps prune,
+  per-project poll toggle + archive (0011).
+- **§9 Mgmt/UX:** Settings (members/tokens/project) in Connect, project switcher,
+  feed "for me" notifications, inline task status/priority/due editing, ARIA pass.
+- **§10 Agents:** distinct agent_id → subagent count in Live agents.
+- **§11 Data:** dropped dead activity_events (0014); reuse-kit search + version.
+- Also hardened db:verify against a busy shared DB (buffer + match own NOTIFY).
+
+Migrations 0010–0014. 22 integration + 17 unit tests green; CI wired.
+
+**Lesson:** working through a written, severity-tagged GAPS.md section-by-section —
+committing + re-running the full suite per section — turns "harden everything" from
+daunting into a steady, verifiable march. Keep prod-strict defaults (rate limit on)
+but let CI/dev disable them via env so functional tests aren't fighting the guardrails.
+
+---
+
 ## 2026-06-08 (j) — Trust the data: token capture + attribution
 
 **Scope:** GAPS §2 (token capture) + §5 (attribution) — all severities

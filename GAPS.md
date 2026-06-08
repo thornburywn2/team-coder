@@ -65,7 +65,7 @@ trust) · 🟢 low (polish / nice-to-have).
   LISTEN/NOTIFY → in-process bus is the seam where a Redis adapter would slot in.
   *(documented; out of scope for a single-appliance hackathon deploy.)*
 
-## 5. Git integration & attribution — attribution ✅ RESOLVED (2026-06-08)
+## 5. Git integration & attribution — ✅ RESOLVED (2026-06-08)
 - ✅ **Email-mismatch attribution fixed.** Coders now have `git_emails[]`; git-poll
   matches any of them. The Report's 🔗 Attribution panel surfaces unmapped commit
   authors and maps each to a coder via `POST /api/attribution/map`, which remembers
