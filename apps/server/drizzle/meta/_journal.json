@@ -50,6 +50,13 @@
       "when": 1780877574297,
       "tag": "0006_vengeful_pandemic",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1780880822789,
+      "tag": "0007_rapid_hiroim",
+      "breakpoints": true
     }
   ]
 }

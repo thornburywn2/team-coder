@@ -161,9 +161,14 @@ export const adrs = pgTable('adrs', {
   consequences: text('consequences'),
   status: adrStatus('status').notNull().default('proposed'),
   authorId: uuid('author_id').references(() => users.id, { onDelete: 'set null' }),
+  // optional client-supplied key to make writes idempotent on retry. NULLs are
+  // distinct in a unique index, so unkeyed rows never collide.
+  idempotencyKey: varchar('idempotency_key', { length: 128 }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({
+  uqIdem: uniqueIndex('uq_adrs_project_idem').on(t.projectId, t.idempotencyKey),
+}));
 
 // ── Shared code patterns ─────────────────────────────────────────────────────
 export const codePatterns = pgTable('code_patterns', {
@@ -175,8 +180,11 @@ export const codePatterns = pgTable('code_patterns', {
   language: varchar('language', { length: 50 }),
   tags: jsonb('tags').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
   authorId: uuid('author_id').references(() => users.id, { onDelete: 'set null' }),
+  idempotencyKey: varchar('idempotency_key', { length: 128 }), // see adrs.idempotencyKey
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (t) => ({
+  uqIdem: uniqueIndex('uq_patterns_project_idem').on(t.projectId, t.idempotencyKey),
+}));
 
 // ── Threaded, polymorphic comments ───────────────────────────────────────────
 export const comments = pgTable('comments', {

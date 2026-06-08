@@ -1,6 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { and, desc, eq, ilike, ne, or, type SQL } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, ne, or, sql, type SQL } from 'drizzle-orm';
 import { TASK_PRIORITY, TASK_STATUS, VOTE_VALUE } from '@team-coder/shared';
 import { db, schema } from '../db';
 import type { Developer } from '../auth';
@@ -209,18 +209,45 @@ export function createMcpServer(dev: Developer): McpServer {
 
   server.registerTool(
     'search_tasks',
-    { description: 'Search tasks by text and/or status.', inputSchema: { query: z.string().optional(), status: z.enum(TASK_STATUS).optional() } },
-    async ({ query, status }) => {
+    {
+      description: 'Search/filter tasks by text, status, assignee, tag, and/or module, with pagination. Returns { tasks, total, limit, offset }.',
+      inputSchema: {
+        query: z.string().optional(),
+        status: z.enum(TASK_STATUS).optional(),
+        assignee: z.string().optional().describe('username/display name, or "me"'),
+        tag: z.string().optional(),
+        module: z.string().optional().describe('module name or path prefix'),
+        limit: z.number().int().optional().describe('default 25, max 100'),
+        offset: z.number().int().optional().describe('default 0'),
+      },
+    },
+    async ({ query, status, assignee, tag, module, limit, offset }) => {
       const conds = [eq(schema.tasks.projectId, pid)];
       if (query) conds.push(ilike(schema.tasks.title, `%${query}%`));
       if (status) conds.push(eq(schema.tasks.status, status));
-      const rows = await db
-        .select(TASK_FIELDS)
-        .from(schema.tasks)
-        .where(and(...conds))
-        .orderBy(desc(schema.tasks.createdAt))
-        .limit(25);
-      return text(rows);
+      if (tag) conds.push(sql`${schema.tasks.tags} @> ${JSON.stringify([tag])}::jsonb`);
+      if (assignee) {
+        let assigneeId = assignee === 'me' ? dev.id : null;
+        if (!assigneeId) {
+          const [u] = await db.select({ id: schema.users.id }).from(schema.users).where(and(eq(schema.users.projectId, pid), or(eq(schema.users.username, assignee), eq(schema.users.displayName, assignee))));
+          if (!u) return text({ error: `no coder named "${assignee}"` });
+          assigneeId = u.id;
+        }
+        conds.push(eq(schema.tasks.assigneeId, assigneeId));
+      }
+      if (module) {
+        const [m] = await db.select({ id: schema.modules.id }).from(schema.modules).where(and(eq(schema.modules.projectId, pid), or(eq(schema.modules.name, module), eq(schema.modules.pathPrefix, module))));
+        if (!m) return text({ error: `no module matching "${module}"` });
+        conds.push(eq(schema.tasks.moduleId, m.id));
+      }
+      const where = and(...conds);
+      const lim = Math.min(Math.max(limit ?? 25, 1), 100);
+      const off = Math.max(offset ?? 0, 0);
+      const [rows, [tot]] = await Promise.all([
+        db.select(TASK_FIELDS).from(schema.tasks).where(where).orderBy(desc(schema.tasks.createdAt)).limit(lim).offset(off),
+        db.select({ n: count() }).from(schema.tasks).where(where),
+      ]);
+      return text({ tasks: rows, total: Number(tot?.n ?? 0), limit: lim, offset: off });
     },
   );
 
@@ -409,9 +436,17 @@ export function createMcpServer(dev: Developer): McpServer {
 
   server.registerTool(
     'post_decision',
-    { description: 'Record an architecture decision (ADR) so the team does not relitigate it.', inputSchema: { title: z.string(), context: z.string(), decision: z.string(), consequences: z.string().optional() } },
-    async ({ title, context, decision, consequences }) => {
-      const [row] = await db.insert(schema.adrs).values({ projectId: pid, title, context, decision, consequences: consequences ?? null, status: 'accepted', authorId: dev.id }).returning({ id: schema.adrs.id, seq: schema.adrs.sequenceNum });
+    { description: 'Record an architecture decision (ADR) so the team does not relitigate it. Pass an idempotency_key to make retries safe (a duplicate key returns the existing ADR instead of creating another).', inputSchema: { title: z.string(), context: z.string(), decision: z.string(), consequences: z.string().optional(), idempotency_key: z.string().optional() } },
+    async ({ title, context, decision, consequences, idempotency_key }) => {
+      const [row] = await db
+        .insert(schema.adrs)
+        .values({ projectId: pid, title, context, decision, consequences: consequences ?? null, status: 'accepted', authorId: dev.id, idempotencyKey: idempotency_key ?? null })
+        .onConflictDoNothing({ target: [schema.adrs.projectId, schema.adrs.idempotencyKey] })
+        .returning({ id: schema.adrs.id, seq: schema.adrs.sequenceNum });
+      if (!row && idempotency_key) {
+        const [existing] = await db.select({ id: schema.adrs.id, seq: schema.adrs.sequenceNum }).from(schema.adrs).where(and(eq(schema.adrs.projectId, pid), eq(schema.adrs.idempotencyKey, idempotency_key)));
+        return text({ ok: true, adr: existing, deduped: true });
+      }
       pushFeed(pid, { ...feedBase, kind: 'decision', detail: `decision: ${title}` });
       return text({ ok: true, adr: row });
     },
@@ -419,9 +454,17 @@ export function createMcpServer(dev: Developer): McpServer {
 
   server.registerTool(
     'add_shared_pattern',
-    { description: 'Publish a reusable code pattern so teammates do not rebuild it.', inputSchema: { title: z.string(), code: z.string(), description: z.string().optional(), language: z.string().optional(), tags: z.array(z.string()).optional() } },
-    async ({ title, code, description, language, tags }) => {
-      const [row] = await db.insert(schema.codePatterns).values({ projectId: pid, title, codeSnippet: code, description: description ?? null, language: language ?? null, tags: tags ?? [], authorId: dev.id }).returning({ id: schema.codePatterns.id });
+    { description: 'Publish a reusable code pattern so teammates do not rebuild it. Pass an idempotency_key to make retries safe (a duplicate key returns the existing pattern instead of creating another).', inputSchema: { title: z.string(), code: z.string(), description: z.string().optional(), language: z.string().optional(), tags: z.array(z.string()).optional(), idempotency_key: z.string().optional() } },
+    async ({ title, code, description, language, tags, idempotency_key }) => {
+      const [row] = await db
+        .insert(schema.codePatterns)
+        .values({ projectId: pid, title, codeSnippet: code, description: description ?? null, language: language ?? null, tags: tags ?? [], authorId: dev.id, idempotencyKey: idempotency_key ?? null })
+        .onConflictDoNothing({ target: [schema.codePatterns.projectId, schema.codePatterns.idempotencyKey] })
+        .returning({ id: schema.codePatterns.id });
+      if (!row && idempotency_key) {
+        const [existing] = await db.select({ id: schema.codePatterns.id }).from(schema.codePatterns).where(and(eq(schema.codePatterns.projectId, pid), eq(schema.codePatterns.idempotencyKey, idempotency_key)));
+        return text({ ok: true, pattern: existing, deduped: true });
+      }
       pushFeed(pid, { ...feedBase, kind: 'pattern', detail: `shared pattern: ${title}` });
       return text({ ok: true, pattern: row });
     },

@@ -8,6 +8,7 @@ import { recentFeed } from '../feed';
 import { computeOwnership } from '../ownership';
 import { buildReport } from '../report';
 import { decomposePrd } from '../lib/decompose';
+import { decomposePrdLlm, llmEnabled } from '../lib/decompose-llm';
 import { taskRoutes } from './tasks';
 import { proposalRoutes } from './proposals';
 import { commentRoutes } from './comments';
@@ -39,16 +40,27 @@ apiRoutes.put('/projects/current/prd', async (c) => {
 
 // Decompose a PRD into candidate tasks for review (preview only — NO writes).
 // Uses the posted PRD if given (preview unsaved edits), else the saved one.
+// Deterministic by default; if DECOMPOSE_LLM is enabled (and mode != 'deterministic')
+// it tries an LLM first and transparently falls back to the parser. The response
+// reports which `mode` produced the candidates.
 apiRoutes.post('/projects/current/decompose', async (c) => {
   const project = c.get('project');
-  const body = (await c.req.json().catch(() => ({}))) as { prd?: string };
+  const body = (await c.req.json().catch(() => ({}))) as { prd?: string; mode?: 'auto' | 'deterministic' | 'llm' };
   const prd = (typeof body.prd === 'string' ? body.prd : project.prd) ?? '';
   if (!prd.trim()) return c.json({ error: 'no PRD to decompose — add a project goal first' }, 400);
   const mods = await db
     .select({ id: schema.modules.id, name: schema.modules.name, pathPrefix: schema.modules.pathPrefix })
     .from(schema.modules)
     .where(eq(schema.modules.projectId, project.id));
-  return c.json({ candidates: decomposePrd(prd, mods) });
+
+  let candidates = null;
+  let mode = 'deterministic';
+  if (body.mode !== 'deterministic' && llmEnabled()) {
+    candidates = await decomposePrdLlm(prd, mods); // null on any failure → fall back
+    if (candidates?.length) mode = 'llm';
+  }
+  if (!candidates?.length) candidates = decomposePrd(prd, mods);
+  return c.json({ candidates, mode });
 });
 
 // live activity feed (in-memory ring buffer, most-recent-first), this project only

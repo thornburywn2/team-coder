@@ -110,7 +110,7 @@ function bulletFallback(lines: string[]): Candidate[] {
     .map((t) => splitTitle(t));
 }
 
-function assignModule(c: Candidate, modules: ModuleHint[]): Candidate {
+export function assignModule(c: Candidate, modules: ModuleHint[]): Candidate {
   const hay = `${c.title} ${c.description ?? ''}`.toLowerCase();
   // longest prefix/name first so the most specific module wins
   const sorted = [...modules].sort((a, b) => b.pathPrefix.length - a.pathPrefix.length);
