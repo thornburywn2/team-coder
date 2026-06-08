@@ -4,6 +4,32 @@
 
 ---
 
+## 2026-06-08 (h) — Token tracking + board hierarchy + 3 tabs
+
+**Scope:** apps/server (usage capture/aggregate, summary), apps/web (board IA, widgets, inline proposals), agent-kit
+**Outcome:** SUCCESS
+
+- **Token usage tracking (per person + aggregate):** sessions.input/output_tokens
+  (migration 0009); captured via hooks (input_tokens/output_tokens/usage), POST
+  /hooks/usage, and the MCP `report_usage` tool. Aggregated in the report (per
+  coder + totals), /api/summary (KPI), and GET /api/usage. UI: tokens KPI, Report
+  per-coder, and a 🪙 Token usage board widget. Demo seeded (~4.7M tokens, Bob top).
+- **Board information hierarchy:** ⭐ Needs your attention (My work / Blockers /
+  Stale) → 📋 The work → 🧩 Reuse kit → 📈 Trends; uniform 460px widget heights with
+  internal scroll (no towering); large charts at the bottom; tooltips everywhere.
+- **Inline proposals:** vote 👍/👎/🤷, discuss (Thread), create, and accept/reject
+  all on the board — no navigation.
+- **Tabs 6→3** (Board · Report · Connect): folded Proposals, Reuse kit, and Agents
+  onto the board.
+
+All 18 verify green (verify-extras now covers token capture).
+
+**Lesson:** Token tracking has no single reliable source from Claude Code hooks —
+expose multiple capture paths (hook payload, REST, MCP tool) that all roll up to one
+per-session counter, then aggregate per coder.
+
+---
+
 ## 2026-06-08 (g) — 2nd project + live repo sync + widget board
 
 **Scope:** apps/server (git-poll/broadcast, summary, repo-status), apps/web (board redesign + widgets), agent-kit (sync), demo-seed-apollo

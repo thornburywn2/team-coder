@@ -47,4 +47,17 @@ Reads: `whoami`, `get_my_tasks`, `list_tasks`, `list_team`, `get_task`,
 `get_team_decisions`, `get_shared_patterns`, `get_comments`.
 Writes: `create_task`, `claim_task`, `assign_task`, `edit_task`,
 `update_task_progress`, `complete_task`, `flag_blocker`, `post_comment`,
-`create_proposal`, `vote_proposal`, `post_decision`, `add_shared_pattern`.
+`create_proposal`, `vote_proposal`, `post_decision`, `add_shared_pattern`,
+`report_usage`.
+
+## Track token usage (so we can minimize it)
+
+The team tracks token spend per person to see where effort goes and improve. Report
+it either way:
+- **Agent:** call the `report_usage` MCP tool with `input_tokens` / `output_tokens`
+  (cumulative or incremental) per task or session.
+- **Hook:** include `input_tokens` / `output_tokens` (or a `usage` object) in your
+  Stop hook payload, or POST them to `<origin>/hooks/usage` with your Bearer token.
+
+It rolls up to your session → per-coder + team totals on the board's 🪙 Token usage
+widget and the Report.
