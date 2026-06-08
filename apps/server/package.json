@@ -23,7 +23,8 @@
     "verify:proposals": "bun run src/verify-proposals.ts",
     "verify:inheritance": "bun run src/verify-inheritance.ts",
     "verify:capabilities": "bun run src/verify-capabilities.ts",
-    "verify:reusekit": "bun run src/verify-reusekit.ts"
+    "verify:reusekit": "bun run src/verify-reusekit.ts",
+    "verify:audit": "bun run src/verify-audit.ts"
   },
   "dependencies": {
     "@team-coder/shared": "workspace:*",

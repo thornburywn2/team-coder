@@ -63,6 +63,40 @@ export function createMcpServer(dev: Developer): McpServer {
   );
 
   server.registerTool(
+    'whoami',
+    { description: 'Who you are on this project — your developer id + name. Use it to recognize your own tasks/assignments.', inputSchema: {} },
+    async () => {
+      const [proj] = await db.select({ name: schema.projects.name }).from(schema.projects).where(eq(schema.projects.id, pid));
+      return text({ developerId: dev.id, username: dev.username, name: me, projectId: pid, project: proj?.name ?? null });
+    },
+  );
+
+  server.registerTool(
+    'get_task',
+    {
+      description: 'Full detail for one task: status, priority, tags, due date, assignee + reporter names, module, and the whole discussion thread (progress notes, blocker reasons, completion summary).',
+      inputSchema: { task_id: z.string() },
+    },
+    async ({ task_id }) => {
+      const [t] = await db.select().from(schema.tasks).where(inProject(eq(schema.tasks.id, task_id)));
+      if (!t) return text({ error: 'task not found' });
+      const people = await db.select({ id: schema.users.id, displayName: schema.users.displayName, username: schema.users.username }).from(schema.users).where(eq(schema.users.projectId, pid));
+      const nameOf = (id: string | null) => { const u = people.find((p) => p.id === id); return u ? (u.displayName ?? u.username) : null; };
+      const [mod] = t.moduleId ? await db.select({ name: schema.modules.name }).from(schema.modules).where(eq(schema.modules.id, t.moduleId)) : [];
+      const thread = await db
+        .select({ authorId: schema.comments.authorId, content: schema.comments.content, createdAt: schema.comments.createdAt })
+        .from(schema.comments)
+        .where(and(eq(schema.comments.projectId, pid), eq(schema.comments.targetType, 'task'), eq(schema.comments.targetId, task_id)))
+        .orderBy(schema.comments.createdAt);
+      return text({
+        id: t.id, title: t.title, description: t.description, status: t.status, priority: t.priority, tags: t.tags, dueDate: t.dueDate, source: t.source,
+        assignee: nameOf(t.assigneeId), reporter: nameOf(t.reporterId), module: mod?.name ?? null,
+        thread: thread.map((c) => ({ author: nameOf(c.authorId), content: c.content, at: c.createdAt })),
+      });
+    },
+  );
+
+  server.registerTool(
     'list_tasks',
     {
       description: 'List the whole team backlog (everyone\'s tasks). Optionally filter by status. Use this to see all work, not just yours.',
@@ -208,6 +242,9 @@ export function createMcpServer(dev: Developer): McpServer {
 
   // ── WRITE ──────────────────────────────────────────────────────────────────
   const feedBase = { developerId: dev.id, developer: me, color: dev.color ?? undefined };
+  // persist a note/blocker-reason/summary into the task thread so it's readable back
+  const noteOnTask = (taskId: string, content: string) =>
+    db.insert(schema.comments).values({ projectId: pid, authorId: dev.id, targetType: 'task', targetId: taskId, content });
 
   server.registerTool(
     'create_proposal',
@@ -291,12 +328,19 @@ export function createMcpServer(dev: Developer): McpServer {
 
   server.registerTool(
     'claim_task',
-    { description: 'Claim a task for yourself (soft, non-blocking). Marks it in_progress.', inputSchema: { task_id: z.string() } },
+    { description: 'Claim a task for yourself (soft, non-blocking). Marks it in_progress. If a teammate already holds it you still get it, but the response warns you of the contention.', inputSchema: { task_id: z.string() } },
     async ({ task_id }) => {
+      // read the prior holder first so we can warn on contention (soft, never blocks)
+      const [before] = await db.select({ assigneeId: schema.tasks.assigneeId }).from(schema.tasks).where(inProject(eq(schema.tasks.id, task_id)));
+      let warning: string | undefined;
+      if (before?.assigneeId && before.assigneeId !== dev.id) {
+        const [held] = await db.select({ displayName: schema.users.displayName, username: schema.users.username }).from(schema.users).where(eq(schema.users.id, before.assigneeId));
+        warning = `was already claimed by ${held?.displayName ?? held?.username ?? 'a teammate'} — coordinate to avoid duplicate work`;
+      }
       const [row] = await db.update(schema.tasks).set({ assigneeId: dev.id, status: 'in_progress', updatedAt: new Date() }).where(inProject(eq(schema.tasks.id, task_id))).returning(TASK_FIELDS);
       if (!row) return text({ error: 'task not found' });
-      pushFeed(pid, { ...feedBase, kind: 'claim', detail: `claimed "${row.title}"` });
-      return text({ ok: true, task: row });
+      pushFeed(pid, { ...feedBase, kind: 'claim', detail: `claimed "${row.title}"${warning ? ' (contended)' : ''}` });
+      return text({ ok: true, task: row, ...(warning ? { warning } : {}) });
     },
   );
 
@@ -345,6 +389,7 @@ export function createMcpServer(dev: Developer): McpServer {
     async ({ task_id, summary }) => {
       const [row] = await db.update(schema.tasks).set({ status: 'done', updatedAt: new Date() }).where(inProject(eq(schema.tasks.id, task_id))).returning(TASK_FIELDS);
       if (!row) return text({ error: 'task not found' });
+      if (summary?.trim()) await noteOnTask(task_id, `✅ Completed: ${summary.trim()}`);
       pushFeed(pid, { ...feedBase, kind: 'done', detail: `completed "${row.title}"${summary ? ` — ${summary}` : ''}` });
       return text({ ok: true, task: row });
     },
@@ -356,6 +401,7 @@ export function createMcpServer(dev: Developer): McpServer {
     async ({ task_id, reason }) => {
       const [row] = await db.update(schema.tasks).set({ status: 'blocked', updatedAt: new Date() }).where(inProject(eq(schema.tasks.id, task_id))).returning(TASK_FIELDS);
       if (!row) return text({ error: 'task not found' });
+      await noteOnTask(task_id, `🚧 Blocked: ${reason}`); // persist the reason so teammates can read why
       pushFeed(pid, { ...feedBase, kind: 'blocked', detail: `blocked "${row.title}": ${reason}` });
       return text({ ok: true, task: row });
     },
