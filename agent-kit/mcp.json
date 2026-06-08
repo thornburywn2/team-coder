@@ -1,0 +1,12 @@
+{
+  "//": "Team Coder MCP config TEMPLATE. You do NOT need to clone the appliance — just grab this. Save it as `.mcp.json` in your PRODUCT repo (Claude Code reads it), then set TEAM_CODER_URL + TEAM_CODER_TOKEN in your shell profile. Quick pull: curl -fsSL https://raw.githubusercontent.com/thornburywn2/team-coder/main/agent-kit/mcp.json -o .mcp.json",
+  "mcpServers": {
+    "team-coder": {
+      "type": "http",
+      "url": "${TEAM_CODER_URL}/mcp",
+      "headers": {
+        "Authorization": "Bearer ${TEAM_CODER_TOKEN}"
+      }
+    }
+  }
+}

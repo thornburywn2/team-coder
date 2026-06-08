@@ -1,5 +1,10 @@
 # Agent Kit — connect any tool to Team Coder
 
+> New here? Start with **[../GETTING-STARTED.md](../GETTING-STARTED.md)** — the
+> 2-minute path once the appliance is deployed. You do **not** need to clone the
+> appliance; you can pull just the MCP config:
+> `curl -fsSL https://raw.githubusercontent.com/thornburywn2/team-coder/main/agent-kit/mcp.json -o .mcp.json`
+
 Team Coder is **client-agnostic**. Whatever you drive your AI with — Claude Code,
 Claude Desktop, Code Puppy, an internal tool, or just a browser — you can plug
 into the same coordination portal. Pick your client below:
